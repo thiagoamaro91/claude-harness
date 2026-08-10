@@ -1,0 +1,94 @@
+# claude-harness sync manifest
+# One row per file. Pipe-separated: kind|tier|repo-path|live-path
+#
+#   kind      sync      copied from a live Claude config file; export.sh and
+#                       import.sh diff these two paths in both directions.
+#             authored  written for this repo; no live counterpart, so the
+#                       sync scripts skip it. install.sh still installs the
+#                       ones whose live-path is not "-".
+#   tier      lowest install tier that includes the file (install.sh --tier N
+#             installs every row with tier <= N). Tier 3 rows are printed,
+#             not copied.
+#   live-path relative to the Claude config dir ($CLAUDE_CONFIG_DIR, default
+#             ~/.claude). "-" means the file never leaves the repo.
+#
+# This manifest is the allowlist. guard/scan.sh and the sync scripts read it,
+# and nothing outside it belongs in the repo.
+
+# --- tier 0: core rules, markdown only, nothing executable ---
+authored|0|claude/CLAUDE.core.md|CLAUDE.core.md
+authored|0|claude/DISPATCH.core.md|DISPATCH.core.md
+authored|0|templates/CLAUDE.md.work|-
+
+# --- tier 1: skills and agents ---
+sync|1|claude/skills/autonomous/references/ledger/append.py|skills/autonomous/references/ledger/append.py
+sync|1|claude/skills/autonomous/references/ledger/test_append.py|skills/autonomous/references/ledger/test_append.py
+sync|1|claude/skills/autonomous/references/marathon.md|skills/autonomous/references/marathon.md
+sync|1|claude/skills/autonomous/references/marathon/run.sh|skills/autonomous/references/marathon/run.sh
+sync|1|claude/skills/autonomous/references/marathon/test-driver.sh|skills/autonomous/references/marathon/test-driver.sh
+sync|1|claude/skills/autonomous/references/produce-heads.md|skills/autonomous/references/produce-heads.md
+sync|1|claude/skills/autonomous/references/quality-gates.md|skills/autonomous/references/quality-gates.md
+sync|1|claude/skills/autonomous/references/workflows/_shim.mjs|skills/autonomous/references/workflows/_shim.mjs
+sync|1|claude/skills/autonomous/references/workflows/_shim.test.mjs|skills/autonomous/references/workflows/_shim.test.mjs
+sync|1|claude/skills/autonomous/references/workflows/build-sdd.js|skills/autonomous/references/workflows/build-sdd.js
+sync|1|claude/skills/autonomous/references/workflows/build-sdd.test.mjs|skills/autonomous/references/workflows/build-sdd.test.mjs
+sync|1|claude/skills/autonomous/references/workflows/candidates.js|skills/autonomous/references/workflows/candidates.js
+sync|1|claude/skills/autonomous/references/workflows/candidates.test.mjs|skills/autonomous/references/workflows/candidates.test.mjs
+sync|1|claude/skills/autonomous/references/workflows/panel.js|skills/autonomous/references/workflows/panel.js
+sync|1|claude/skills/autonomous/references/workflows/panel.test.mjs|skills/autonomous/references/workflows/panel.test.mjs
+sync|1|claude/skills/autonomous/references/workflows/README.md|skills/autonomous/references/workflows/README.md
+sync|1|claude/skills/autonomous/references/workflows/recon.js|skills/autonomous/references/workflows/recon.js
+sync|1|claude/skills/autonomous/references/workflows/recon.test.mjs|skills/autonomous/references/workflows/recon.test.mjs
+sync|1|claude/skills/autonomous/SKILL.md|skills/autonomous/SKILL.md
+sync|1|claude/skills/edit-freeze/SKILL.md|skills/edit-freeze/SKILL.md
+sync|1|claude/skills/expert-panel/references/architect.md|skills/expert-panel/references/architect.md
+sync|1|claude/skills/expert-panel/references/data-architect.md|skills/expert-panel/references/data-architect.md
+sync|1|claude/skills/expert-panel/references/dev-lead.md|skills/expert-panel/references/dev-lead.md
+sync|1|claude/skills/expert-panel/references/MANIFEST-TEMPLATE.md|skills/expert-panel/references/MANIFEST-TEMPLATE.md
+sync|1|claude/skills/expert-panel/references/product-owner.md|skills/expert-panel/references/product-owner.md
+sync|1|claude/skills/expert-panel/SKILL.md|skills/expert-panel/SKILL.md
+sync|1|claude/skills/forcing-questions/SKILL.md|skills/forcing-questions/SKILL.md
+sync|1|claude/skills/graphify/references/add-watch.md|skills/graphify/references/add-watch.md
+sync|1|claude/skills/graphify/references/exports.md|skills/graphify/references/exports.md
+sync|1|claude/skills/graphify/references/extraction-spec.md|skills/graphify/references/extraction-spec.md
+sync|1|claude/skills/graphify/references/github-and-merge.md|skills/graphify/references/github-and-merge.md
+sync|1|claude/skills/graphify/references/hooks.md|skills/graphify/references/hooks.md
+sync|1|claude/skills/graphify/references/query.md|skills/graphify/references/query.md
+sync|1|claude/skills/graphify/references/transcribe.md|skills/graphify/references/transcribe.md
+sync|1|claude/skills/graphify/references/update.md|skills/graphify/references/update.md
+sync|1|claude/skills/graphify/SKILL.md|skills/graphify/SKILL.md
+sync|1|claude/skills/humanizer/LICENSE|skills/humanizer/LICENSE
+sync|1|claude/skills/humanizer/SKILL.md|skills/humanizer/SKILL.md
+sync|1|claude/skills/spec-diagram/references/palette.md|skills/spec-diagram/references/palette.md
+sync|1|claude/skills/spec-diagram/references/syntax-gotchas.md|skills/spec-diagram/references/syntax-gotchas.md
+sync|1|claude/skills/spec-diagram/references/tool-landscape.md|skills/spec-diagram/references/tool-landscape.md
+sync|1|claude/skills/spec-diagram/SKILL.md|skills/spec-diagram/SKILL.md
+sync|1|claude/agents/agent-db.md|agents/agent-db.md
+sync|1|claude/agents/agent-google.md|agents/agent-google.md
+sync|1|claude/agents/web-verifier.md|agents/web-verifier.md
+
+# --- tier 2: hooks and settings wiring ---
+sync|2|claude/hooks/block-destructive-bash.sh|hooks/block-destructive-bash.sh
+sync|2|claude/hooks/block-em-dash.sh|hooks/block-em-dash.sh
+sync|2|claude/hooks/guard-agent-briefing.sh|hooks/guard-agent-briefing.sh
+sync|2|claude/hooks/guard-edit-boundary.sh|hooks/guard-edit-boundary.sh
+sync|2|claude/hooks/guard-reread.sh|hooks/guard-reread.sh
+sync|2|claude/hooks/log-skill-fire.sh|hooks/log-skill-fire.sh
+authored|2|claude/hooks/tests/test-guards-smoke.sh|hooks/tests/test-guards-smoke.sh
+authored|2|claude/settings.work.template.json|-
+
+# --- tier 3: optional MCP and plugin layers, print only ---
+authored|3|claude/mcp.manifest.md|-
+authored|3|claude/plugins.manifest.md|-
+
+# --- repo infrastructure: never installed ---
+authored|9|README.md|-
+authored|9|manifest.txt|-
+authored|9|bin/_lib.sh|-
+authored|9|bin/export.sh|-
+authored|9|bin/import.sh|-
+authored|9|bin/install.sh|-
+authored|9|guard/scan.sh|-
+authored|9|guard/denylist.example|-
+authored|9|.githooks/pre-push|-
+authored|9|.gitignore|-

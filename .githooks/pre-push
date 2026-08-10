@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Refuse to push anything guard/scan.sh flags.
+#
+# Enabled with:  git config core.hooksPath .githooks
+# Bypass is deliberately not documented here. If a finding is a false positive,
+# fix the pattern in guard/denylist.local or narrow the one in guard/scan.sh,
+# then push again. Silencing the scanner to get a push through is how personal
+# data reaches a remote.
+
+set -u
+
+ROOT="$(git rev-parse --show-toplevel)"
+SCAN="$ROOT/guard/scan.sh"
+
+if [ ! -x "$SCAN" ]; then
+  echo "pre-push: $SCAN missing or not executable, refusing to push blind" >&2
+  exit 1
+fi
+
+if [ ! -f "$ROOT/guard/denylist.local" ]; then
+  echo "pre-push: guard/denylist.local is absent. It is gitignored and never" >&2
+  echo "          travels with a clone, so a fresh checkout has no private" >&2
+  echo "          denylist. This is a HARD BLOCK, not a clean scan: guard/scan.sh" >&2
+  echo "          fails closed until you copy guard/denylist.example to" >&2
+  echo "          guard/denylist.local and fill it in." >&2
+fi
+
+if ! "$SCAN" "$ROOT"; then
+  echo "" >&2
+  echo "pre-push: BLOCKED by guard/scan.sh. Fix the findings above, then push." >&2
+  exit 1
+fi
+
+exit 0

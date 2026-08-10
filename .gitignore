@@ -1,0 +1,15 @@
+# The real denylist never leaves this machine.
+guard/denylist.local
+
+# Any *.local file is machine-private by convention.
+*.local
+
+# The example IS committed; the catch-all above must not swallow it.
+!guard/denylist.example
+
+.DS_Store
+__pycache__/
+*.pyc
+*.swp
+*~
+harness-backup-*/

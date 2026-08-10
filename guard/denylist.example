@@ -1,0 +1,78 @@
+# guard/denylist.example - template for guard/denylist.local
+#
+# Copy this file to guard/denylist.local, then REPLACE the PLACEHOLDER lines in
+# the "fill in" sections below with your own sensitive strings. denylist.local
+# is gitignored on purpose: the whole point is that these strings never land in
+# a committed file, and a committed denylist would defeat itself by naming them.
+#
+# THIS FILE SHIPS NO WORKING PATTERNS, so a verbatim copy does NOT pass the
+# scan. Every non-comment line below is an ACTIVE PLACEHOLDER sentinel, and
+# guard/scan.sh fails closed on any active PLACEHOLDER line. Structural markers
+# (absolute home paths, note-vault paths, private-range and tailnet hosts,
+# IBAN-shaped strings, and the like) are built into the scanner's unconditional
+# PASS A, so you do NOT list them here. This file is only for the user-specific
+# strings PASS A cannot guess: names, employer, clients, specific hostnames, and
+# phone numbers.
+#
+# Two ways this stays fail-closed until you configure it: a raw copy still has
+# active PLACEHOLDER sentinels (the scan FAILS on them), and deleting the
+# sentinels without adding real patterns leaves zero active patterns (the scan
+# FAILS on that too). Replace each PLACEHOLDER sentinel with your real patterns
+# rather than merely deleting it.
+#
+# Format: one POSIX extended regular expression per line. Blank lines and lines
+# starting with "#" are ignored. Matching is case-insensitive.
+#
+# Guard short names against false positives. BSD grep does not honor \b in an
+# ERE, so wrap a short word like this instead:
+#     (^|[^A-Za-z])NAME([^A-Za-z]|$)
+# Escape dots in hostnames, or the dot matches any character:
+#     internal-box\.example\.lan
+# A bracketed first character (e.g. [U] instead of U) lets a pattern name a
+# marker without this file literally containing that marker.
+#
+# guard/scan.sh FAILS the push if this list has zero active patterns or if any
+# ACTIVE (non-comment) line still contains the token PLACEHOLDER, so REPLACE (do
+# not merely delete) every PLACEHOLDER sentinel with your real patterns. The
+# scanner ALSO catches the U+2014 em-dash directly, by its byte sequence, so no
+# line here is needed for it (a literal em-dash could not be written into this
+# file anyway).
+#
+# Run guard/scan.sh after editing. The pre-push hook runs it for you and refuses
+# the push on any finding.
+
+# --- FILL IN: family and personal names ---------------------------------------
+# Every first name, surname, and nickname that appears in your notes: partner,
+# children, and anyone whose name shows up in a memory filename. Replace the
+# PLACEHOLDER line below with your patterns (one regex per line), then delete
+# the PLACEHOLDER line. Example forms:
+#   (^|[^A-Za-z])firstname([^A-Za-z]|$)
+#   (^|[^A-Za-z])surname([^A-Za-z]|$)
+PLACEHOLDER-REPLACE-WITH-YOUR-FAMILY-AND-PERSONAL-NAMES
+
+# --- FILL IN: employer and client names ---------------------------------------
+# Current employer, previous employers still under NDA, and every client or
+# prospect named in your working notes. Include common abbreviations and
+# internal project codenames. Replace the PLACEHOLDER line below, then delete
+# it:
+#   (^|[^A-Za-z])your-employer([^A-Za-z]|$)
+#   (^|[^A-Za-z])your-client([^A-Za-z]|$)
+#   (^|[^A-Za-z])project-codename([^A-Za-z]|$)
+PLACEHOLDER-REPLACE-WITH-EMPLOYER-AND-CLIENT-NAMES
+
+# --- FILL IN: internal hostnames and networks ---------------------------------
+# Machine names, VPN identifiers, and internal domains that identify one of your
+# boxes. The generic tailnet and private-range forms are already covered by the
+# scanner's PASS A; add your SPECIFIC ones here. Replace the PLACEHOLDER line
+# below, then delete it:
+#   your-laptop\.local
+#   internal-box\.example\.lan
+PLACEHOLDER-REPLACE-WITH-INTERNAL-HOSTNAMES-AND-NETWORKS
+
+# --- FILL IN: phone numbers and account ids -----------------------------------
+# Phone numbers in every format you write them (with and without country code,
+# spaces, or dashes), plus chat ids, customer numbers, and membership numbers.
+# Replace the PLACEHOLDER line below, then delete it:
+#   \+?[0-9]{2}[ -]?[0-9]{3}[ -]?[0-9]{3}[ -]?[0-9]{3}
+#   [0-9]{9,12}
+PLACEHOLDER-REPLACE-WITH-PERSONAL-PHONE-AND-ACCOUNT-IDS

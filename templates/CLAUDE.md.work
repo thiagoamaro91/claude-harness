@@ -1,0 +1,24 @@
+# CLAUDE.md (work machine)
+
+Thin top-level config. The portable rules live in the installed harness core;
+this file imports them and holds only what is specific to this machine and this
+job.
+
+@CLAUDE.core.md
+
+Both `CLAUDE.core.md` and `DISPATCH.core.md` are installed next to this file, so
+the relative import above resolves. Read `DISPATCH.core.md` for the dispatch
+contract; it is not auto-imported so that the core file stays usable on its own.
+
+## Work overlay
+
+Machine and employer specifics go here and nowhere else. Nothing in this
+section is ever synced back to the harness repo.
+
+Things worth filling in, once you know them:
+
+- Where work repositories live on this machine, and which ones are in scope.
+- Any directory the agent must never read or write.
+- The team's build, test, and lint commands when they differ from the default.
+- Review and approval rules that apply to this codebase.
+- Who to ask when a policy question comes up.
