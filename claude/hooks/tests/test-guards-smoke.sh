@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke tests for the six guard hooks shipped in this repo. Synthetic
+# Smoke tests for the five guard hooks shipped in this repo. Synthetic
 # PreToolUse/PostToolUse JSON on stdin; asserts exit codes and, where the hook
 # emits one, the updatedInput JSON on stdout.
 #
@@ -107,39 +107,6 @@ check e7-edit-newstring 0 $ec '.new_string' 'new, text' "$out"
 out=$(we_json "one${EM}two
 " | bash "$E" 2>/dev/null); ec=$?
 check e8-trailing-newline 0 $ec '.content | length' '9' "$out"
-
-# ------------------------------------------------------------ agent briefing
-B="$DIR/guard-agent-briefing.sh"
-ag_json() { jq -n --arg p "$1" --arg s "$2" --arg m "$3" \
-  '{tool_name:"Agent",tool_input:({prompt:$p,description:"t",subagent_type:$s} + (if $m == "" then {} else {model:$m} end))}'; }
-LONG=$(printf 'x%.0s' $(seq 1 600))
-MED=$(printf 'x%.0s' $(seq 1 250))
-
-out=$(ag_json "$LONG" general-purpose '' | bash "$B" 2>/dev/null); ec=$?
-check b1-inject-gp-opus 0 $ec '.model' 'opus' "$out"
-out=$(ag_json 'short prompt' general-purpose '' | bash "$B" 2>/dev/null); ec=$?
-check b2-block-short 2 $ec '' '' "$out"
-out=$(ag_json 'tiny [brief-ok]' general-purpose '' | bash "$B" 2>/dev/null); ec=$?
-check b3-briefok-still-injects 0 $ec '.model' 'opus' "$out"
-out=$(ag_json "$LONG" web-verifier '' | bash "$B" 2>/dev/null); ec=$?
-check b4-specialist-injected 0 $ec '.model' 'opus' "$out"
-out=$(ag_json "$MED" Explore '' | bash "$B" 2>/dev/null); ec=$?
-check b5-explore-inject-sonnet 0 $ec '.model' 'sonnet' "$out"
-out=$(ag_json "$LONG" general-purpose haiku | bash "$B" 2>/dev/null); ec=$?
-check b6-explicit-model-pass 0 $ec '' '' "$out"
-out=$(ag_json 'short' Explore '' | bash "$B" 2>/dev/null); ec=$?
-check b7-explore-short-block 2 $ec '' '' "$out"
-export HARNESS_CONDUCTOR_MODELS="testconductor"
-out=$(ag_json "$LONG" general-purpose testconductor | bash "$B" 2>/dev/null); ec=$?
-check b8-conductor-executor-blocked 2 $ec '' '' "$out"
-out=$(ag_json "$LONG [conductor-ok]" general-purpose testconductor | bash "$B" 2>/dev/null); ec=$?
-check b9-conductor-tagged-passes 0 $ec '' '' "$out"
-unset HARNESS_CONDUCTOR_MODELS
-wf_json() { jq -n --arg s "$1" '{tool_name:"Workflow",tool_input:{script:$s}}'; }
-out=$(wf_json 'await agent({ prompt: "x" })' | bash "$B" 2>/dev/null); ec=$?
-check b10-workflow-unpinned-blocked 2 $ec '' '' "$out"
-out=$(wf_json 'await agent({ prompt: "x", model: "sonnet" })' | bash "$B" 2>/dev/null); ec=$?
-check b11-workflow-pinned-passes 0 $ec '' '' "$out"
 
 # ------------------------------------------------------------- edit boundary
 EB="$DIR/guard-edit-boundary.sh"

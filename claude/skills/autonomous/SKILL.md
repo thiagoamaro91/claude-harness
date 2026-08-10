@@ -21,6 +21,17 @@ description: >-
 One research-grounded loop, four produce-heads, adversarial verification at both
 ends. You drive it heads-down and surface at exactly two checkpoints.
 
+> **Executable helpers install at tier 2; they are optional at tier 1.** This
+> skill's automation, the marathon runner (`references/marathon/run.sh`), the
+> runs ledger (`references/ledger/append.py`), and the Workflow scripts under
+> `references/workflows/`, ships at tier 2 of the harness. At tier 1 the skill
+> still guides the work by hand; the automation is simply not on disk. So treat
+> every `scriptPath`, `python3 .../append.py`, and marathon reference below as
+> OPTIONAL: if the file is not present, do that step manually and do not treat
+> the missing file as an error. Phrasings later on like "you ARE expected to
+> call the Workflow tool" or "never by hand-writing JSONL" assume the tier-2
+> helpers are installed; without them, the manual fallback is the correct path.
+
 ## Why this exists
 
 Autonomous work fails two symmetric ways: you build confidently on wrong or

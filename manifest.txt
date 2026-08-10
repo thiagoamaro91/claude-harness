@@ -20,25 +20,28 @@ authored|0|claude/CLAUDE.core.md|CLAUDE.core.md
 authored|0|claude/DISPATCH.core.md|DISPATCH.core.md
 authored|0|templates/CLAUDE.md.work|-
 
-# --- tier 1: skills and agents ---
-sync|1|claude/skills/autonomous/references/ledger/append.py|skills/autonomous/references/ledger/append.py
-sync|1|claude/skills/autonomous/references/ledger/test_append.py|skills/autonomous/references/ledger/test_append.py
+# --- tier 1: skills and agents (markdown only, nothing executes) ---
+# The autonomous skill's executable helpers (its .py/.sh/.js/.mjs files) live in
+# this block by path but are marked tier 2, so they install with the hooks, not
+# with the markdown. See the tier field on each row.
+sync|2|claude/skills/autonomous/references/ledger/append.py|skills/autonomous/references/ledger/append.py
+sync|2|claude/skills/autonomous/references/ledger/test_append.py|skills/autonomous/references/ledger/test_append.py
 sync|1|claude/skills/autonomous/references/marathon.md|skills/autonomous/references/marathon.md
-sync|1|claude/skills/autonomous/references/marathon/run.sh|skills/autonomous/references/marathon/run.sh
-sync|1|claude/skills/autonomous/references/marathon/test-driver.sh|skills/autonomous/references/marathon/test-driver.sh
+sync|2|claude/skills/autonomous/references/marathon/run.sh|skills/autonomous/references/marathon/run.sh
+sync|2|claude/skills/autonomous/references/marathon/test-driver.sh|skills/autonomous/references/marathon/test-driver.sh
 sync|1|claude/skills/autonomous/references/produce-heads.md|skills/autonomous/references/produce-heads.md
 sync|1|claude/skills/autonomous/references/quality-gates.md|skills/autonomous/references/quality-gates.md
-sync|1|claude/skills/autonomous/references/workflows/_shim.mjs|skills/autonomous/references/workflows/_shim.mjs
-sync|1|claude/skills/autonomous/references/workflows/_shim.test.mjs|skills/autonomous/references/workflows/_shim.test.mjs
-sync|1|claude/skills/autonomous/references/workflows/build-sdd.js|skills/autonomous/references/workflows/build-sdd.js
-sync|1|claude/skills/autonomous/references/workflows/build-sdd.test.mjs|skills/autonomous/references/workflows/build-sdd.test.mjs
-sync|1|claude/skills/autonomous/references/workflows/candidates.js|skills/autonomous/references/workflows/candidates.js
-sync|1|claude/skills/autonomous/references/workflows/candidates.test.mjs|skills/autonomous/references/workflows/candidates.test.mjs
-sync|1|claude/skills/autonomous/references/workflows/panel.js|skills/autonomous/references/workflows/panel.js
-sync|1|claude/skills/autonomous/references/workflows/panel.test.mjs|skills/autonomous/references/workflows/panel.test.mjs
+sync|2|claude/skills/autonomous/references/workflows/_shim.mjs|skills/autonomous/references/workflows/_shim.mjs
+sync|2|claude/skills/autonomous/references/workflows/_shim.test.mjs|skills/autonomous/references/workflows/_shim.test.mjs
+sync|2|claude/skills/autonomous/references/workflows/build-sdd.js|skills/autonomous/references/workflows/build-sdd.js
+sync|2|claude/skills/autonomous/references/workflows/build-sdd.test.mjs|skills/autonomous/references/workflows/build-sdd.test.mjs
+sync|2|claude/skills/autonomous/references/workflows/candidates.js|skills/autonomous/references/workflows/candidates.js
+sync|2|claude/skills/autonomous/references/workflows/candidates.test.mjs|skills/autonomous/references/workflows/candidates.test.mjs
+sync|2|claude/skills/autonomous/references/workflows/panel.js|skills/autonomous/references/workflows/panel.js
+sync|2|claude/skills/autonomous/references/workflows/panel.test.mjs|skills/autonomous/references/workflows/panel.test.mjs
 sync|1|claude/skills/autonomous/references/workflows/README.md|skills/autonomous/references/workflows/README.md
-sync|1|claude/skills/autonomous/references/workflows/recon.js|skills/autonomous/references/workflows/recon.js
-sync|1|claude/skills/autonomous/references/workflows/recon.test.mjs|skills/autonomous/references/workflows/recon.test.mjs
+sync|2|claude/skills/autonomous/references/workflows/recon.js|skills/autonomous/references/workflows/recon.js
+sync|2|claude/skills/autonomous/references/workflows/recon.test.mjs|skills/autonomous/references/workflows/recon.test.mjs
 sync|1|claude/skills/autonomous/SKILL.md|skills/autonomous/SKILL.md
 sync|1|claude/skills/edit-freeze/SKILL.md|skills/edit-freeze/SKILL.md
 sync|1|claude/skills/expert-panel/references/architect.md|skills/expert-panel/references/architect.md
@@ -63,14 +66,12 @@ sync|1|claude/skills/spec-diagram/references/palette.md|skills/spec-diagram/refe
 sync|1|claude/skills/spec-diagram/references/syntax-gotchas.md|skills/spec-diagram/references/syntax-gotchas.md
 sync|1|claude/skills/spec-diagram/references/tool-landscape.md|skills/spec-diagram/references/tool-landscape.md
 sync|1|claude/skills/spec-diagram/SKILL.md|skills/spec-diagram/SKILL.md
-sync|1|claude/agents/agent-db.md|agents/agent-db.md
-sync|1|claude/agents/agent-google.md|agents/agent-google.md
 sync|1|claude/agents/web-verifier.md|agents/web-verifier.md
 
-# --- tier 2: hooks and settings wiring ---
+# --- tier 2: guard hooks, settings wiring, and the autonomous skill's ---
+# --- executable helpers (marked tier 2 in the tier-1 block above) --------
 sync|2|claude/hooks/block-destructive-bash.sh|hooks/block-destructive-bash.sh
 sync|2|claude/hooks/block-em-dash.sh|hooks/block-em-dash.sh
-sync|2|claude/hooks/guard-agent-briefing.sh|hooks/guard-agent-briefing.sh
 sync|2|claude/hooks/guard-edit-boundary.sh|hooks/guard-edit-boundary.sh
 sync|2|claude/hooks/guard-reread.sh|hooks/guard-reread.sh
 sync|2|claude/hooks/log-skill-fire.sh|hooks/log-skill-fire.sh

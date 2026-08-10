@@ -66,15 +66,6 @@
         ]
       },
       {
-        "matcher": "Task|Agent|Workflow",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "__CLAUDE_HOME__/hooks/guard-agent-briefing.sh"
-          }
-        ]
-      },
-      {
         "matcher": "Read",
         "hooks": [
           {

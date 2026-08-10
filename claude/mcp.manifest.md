@@ -7,9 +7,6 @@ before installing any of them, and install none of them by default.
 
 Nothing in tiers 0 through 2 depends on an MCP server. Skills and agents that can
 use one carry an "MCP optional" fallback line telling you what to do without it.
-That includes the project-specific MCPs a shipped agent may reach for (for example
-a database MCP or a cloud-provider MCP): those are tier 3 too and go through the
-same gate as the servers listed below.
 
 ## The policy question to ask first
 

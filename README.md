@@ -1,7 +1,7 @@
 # claude-harness
 
 The portable, work-safe subset of a personal Claude Code harness: seven skills,
-three subagents, six guard hooks, two core rule documents, and the tooling to
+one subagent, five guard hooks, two core rule documents, and the tooling to
 install them on a machine you do not control.
 
 This exists because a good agent setup takes months to tune and none of it
@@ -39,14 +39,15 @@ and still have something useful.
 | Tier | Adds | Needs |
 |---|---|---|
 | 0 | `CLAUDE.core.md`, `DISPATCH.core.md`, the work `CLAUDE.md` template | Nothing. Plain markdown, nothing executes. |
-| 1 | 7 skills, 3 subagents | Mostly markdown, but not purely: the `autonomous` skill also ships helper scripts (`marathon/run.sh`, `ledger/append.py`, five Node workflow files) that the agent runs only when that skill is invoked, and `graphify` expects a third-party CLI installed from PyPI, which is a software-approval item on a managed machine. Nothing here is wired to run automatically. |
-| 2 | 6 guard hooks, settings wiring | Permission for the agent to run local shell scripts on every tool call. Needs `jq`; `perl` for the em-dash transform. |
+| 1 | 7 skills, 1 subagent | Markdown only, nothing executes. Two caveats: the `autonomous` skill installs its guidance here but its automation (the marathon runner, the ledger, the Node workflow scripts) only at tier 2, so at tier 1 it walks you through the work by hand; and `graphify` expects a third-party CLI installed from PyPI, a software-approval item on a managed machine. Nothing here is wired to run. |
+| 2 | 5 guard hooks, settings wiring, the `autonomous` skill's executable helpers | Permission for the agent to run local shell scripts. The guard hooks fire on every tool call; the helper scripts (`marathon/run.sh`, `ledger/append.py`, the Node workflow scripts and their tests) run only when you invoke the `autonomous` skill. Needs `jq`; `perl` for the em-dash transform. |
 | 3 | MCP and plugin manifests | Network access and a policy decision per server or plugin. Installs nothing by itself. |
 
-Tier 1 is the default because it is the best capability-per-risk trade. Its
-helper scripts execute only inside a skill you deliberately invoke, whereas a
-tier-2 hook runs on every single tool call, which is the real step up in what
-you are asking IT to accept.
+Tier 1 is the default because it is the best capability-per-risk trade: it is
+pure markdown, nothing executes. Tier 2 is the real step up in what you are
+asking IT to accept, because it adds both the guard hooks (which run on every
+single tool call) and the `autonomous` skill's helper scripts (which run only
+inside that skill when you invoke it).
 
 ## Work-PC quickstart
 
@@ -71,11 +72,12 @@ Per tier:
 
 - **Tier 1**, the default: adds `autonomous`, `edit-freeze`, `expert-panel`,
   `forcing-questions`, `graphify`, `humanizer`, `spec-diagram`, plus the
-  `web-verifier`, `agent-google`, and `agent-db` subagents.
+  `web-verifier` subagent.
 
-- **Tier 2**, once shell hooks are cleared: adds the guards and either installs
-  `settings.json` (if none exists) or writes the substituted template beside
-  yours and prints merge steps. Verify afterwards:
+- **Tier 2**, once shell hooks are cleared: adds the guards and the `autonomous`
+  skill's executable helpers, and either installs `settings.json` (if none
+  exists) or writes the substituted template beside yours and prints merge
+  steps. Verify afterwards:
   ```bash
   bash claude/hooks/tests/test-guards-smoke.sh
   HOOKS_DIR=~/.claude/hooks bash claude/hooks/tests/test-guards-smoke.sh
@@ -99,7 +101,7 @@ installed file with the real directory.
    stored? (A credential helper, a keychain, or an environment variable are
    very different answers.)
 3. **Agent-run shell hooks.** May the agent execute local shell scripts on
-   every tool call? That is what a hook is. (Tier 2. The six here only block,
+   every tool call? That is what a hook is. (Tier 2. The five here only block,
    rewrite, or log; none makes a network call.)
 4. **MCP servers.** May I run local helper processes that the agent calls, some
    of which make outbound network requests? (Tier 3, see
@@ -170,8 +172,8 @@ claude/
   mcp.manifest.md             optional MCP servers (tier 3, reading only)
   plugins.manifest.md         optional plugins (tier 3, reading only)
   skills/                     7 skills (tier 1)
-  agents/                     3 subagents (tier 1)
-  hooks/                      6 guards + smoke test (tier 2)
+  agents/                     1 subagent (tier 1)
+  hooks/                      5 guards + smoke test (tier 2)
 templates/CLAUDE.md.work      thin work-machine CLAUDE.md
 bin/{export,install,import}.sh
 guard/{scan.sh,denylist.example}

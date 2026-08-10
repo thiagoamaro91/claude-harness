@@ -1,9 +1,7 @@
 # Dispatch and Orchestration Playbook
 
-Applies in every session, on any model. Rules 1 and 2 are mechanically enforced
-by `guard-agent-briefing.sh` when hooks are installed (tier 2): it blocks the
-dispatch and echoes the fix. At tiers 0 and 1 they are conventions you follow by
-hand.
+Applies in every session. These are conventions you follow by hand; nothing here
+is enforced by a hook.
 
 Rule numbering is kept sparse on purpose. Gaps in the sequence are intentional,
 not missing rules.
@@ -28,39 +26,10 @@ prompt as a self-contained briefing with these five parts:
 5. **DONE CHECK**: how the agent verifies its own work before returning (run
    the test, curl the endpoint, re-grep the tree).
 
-The guard enforces a minimum of 500 characters for general-purpose dispatches
-and 200 for Explore/Plan. A deliberate tiny dispatch carries `[brief-ok]` in the
-prompt, which waives the length minimum and nothing else.
-
-## 2. Pick the model per dispatch, never inherit by default
-
-Pass `model` explicitly on every general-purpose dispatch AND on every
-Workflow-tool `agent()` call. Unpinned calls inherit the session model, which is
-how one script quietly fans a whole fleet out on the priciest tier.
-
-- **haiku**: mechanical work (extraction, reformatting, log scans, checklist
-  sweeps).
-- **opus**: default executor. Code, standard multi-step tasks, adversarial
-  verification, judging other agents' output, architecture decisions.
-- **sonnet**: deliberate step-down for bulk or well-fenced work where opus is
-  overkill and the output contract is simple. Pin it on purpose, not by habit.
-- **Any tier above the ones named here** (a premium, conductor-tier model, where
-  the environment offers one): conductor only, never an executor. Because it is the
-  most capable and most expensive tier available, an executor that inherits it is
-  the largest single cost leak you can create. The guard blocks dispatches pinned
-  to this tier, and pin-free Workflow scripts, unless the prompt carries the
-  deliberate override marker (which the guard names when it blocks). That override
-  should be rare, for example an adversarial judge on a high-stakes call.
-
-The guard injects a pin on EVERY unpinned dispatch, typed specialists included,
-because marketplace plugin agents commonly ship `model: "inherit"`, which
-resolves to the session model. Injection is sonnet for Explore/Plan and opus for
-everything else. An explicit call-time model always wins.
-
-Never set `CLAUDE_CODE_SUBAGENT_MODEL` in settings. It silently overrides every
-per-call model pin, including the haiku and sonnet step-downs above, and it does
-so invisibly. "Default executor" is this rule, enforced by passing `model`
-explicitly on every dispatch, never an environment variable.
+A one-line dispatch that skips these parts is the most common cause of a subagent
+returning the wrong thing. Give a general-purpose agent enough context to stand
+on its own; an Explore or Plan agent can take less, but still needs the objective
+and the output contract.
 
 ## 4. Orchestrator stance and dispatch triggers
 

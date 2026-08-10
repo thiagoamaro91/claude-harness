@@ -5,8 +5,8 @@
 #
 # Tiers are cumulative:
 #   0  core rule markdown only. Nothing executable, nothing wired.
-#   1  + skills and agents.
-#   2  + guard hooks and the settings template.
+#   1  + skills and agents (markdown only, nothing executes).
+#   2  + guard hooks, the settings template, and skill executable helpers.
 #   3  + prints the MCP and plugin manifests. Copies nothing extra: those two
 #         layers need network access and a policy decision, so they stay
 #         manual on purpose.
