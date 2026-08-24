@@ -137,6 +137,41 @@ the edit-boundary state file to `${COPILOT_HOME:-$HOME/.copilot}/hooks/state/`,
 and the reread ledger to `$TMPDIR/copilot-reads-$(id -u)/`. Both targets can be
 installed on one machine without sharing state.
 
+## The cost of sharing skills verbatim
+
+Not duplicating the skills is the right call, and it has one consequence worth
+naming: a shared skill that references the *Claude* config directory in prose
+or in a shell snippet is installed unchanged onto the Copilot target, and the
+installer's placeholder substitution does not rewrite it, because it is a
+literal path rather than a `__CLAUDE_HOME__` placeholder.
+
+One case actually breaks something. `edit-freeze/SKILL.md` arms the boundary
+with `CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"`, so on the Copilot target it
+would write a state file that the ported hook never reads. The boundary would
+appear armed and freeze nothing, which is the worst failure mode a guard has:
+the user believes edits are confined and they are not.
+
+Fixed inside `copilot/`, not by touching the shared skill:
+`copilot/hooks/guard-edit-boundary.sh` resolves its state file in the order
+override, Copilot path, Claude path. The skill keeps working, one freeze intent
+covers both agents on a machine that has both, and `claude/` stays untouched.
+The smoke test now exercises the default resolution path explicitly, which the
+original suite never did because every boundary case passed
+`EDIT_BOUNDARY_FILE`.
+
+The remaining cases are cosmetic or benign and are deliberately left alone:
+
+| File | Reference | Effect on the Copilot target |
+|---|---|---|
+| `edit-freeze/SKILL.md` | arms `$CLAUDE_CONFIG_DIR/hooks/state/` | **fixed** by the fallback above |
+| `autonomous/references/ledger/append.py` | writes its ledger under `$CLAUDE_CONFIG_DIR` or `~/.claude` | ledger lands in the Claude directory instead of the Copilot one. It still works; the file is just in the neighboring folder. |
+| `autonomous/references/marathon.md`, `workflows/README.md` | quote `~/.claude/skills/...` invocation paths in prose | a human following the instruction literally uses the wrong path. Documentation, not behavior. |
+| `expert-panel/SKILL.md` | reads a project manifest at `.claude/expert-panel.md` | unaffected: that is a per-project path, not a config-directory path, and Copilot reads `.claude/` project files anyway. |
+
+Fixing the middle two properly means parameterizing the shared skills, which
+touches `claude/` and changes the Claude target's behavior. That is a separate
+change with its own testing, not something to smuggle into a port.
+
 ## Timeouts fail open, so a short timeout is less safe, not more
 
 Copilot hook timeouts **always fail open**: the tool call proceeds. The default

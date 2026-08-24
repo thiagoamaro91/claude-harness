@@ -39,7 +39,30 @@
 # Copilot docs name the write tools but do not publish their argument schema.
 
 LOG="${GUARD_LOG:-${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log}"
-STATE="${EDIT_BOUNDARY_FILE:-${COPILOT_HOME:-$HOME/.copilot}/hooks/state/edit-boundary}"
+
+# State-file resolution, in order: an explicit override, the Copilot path, then
+# the Claude path.
+#
+# The Claude fallback is not tidiness, it is what makes the feature work at all.
+# The edit-freeze skill is SHARED verbatim between the two targets (the
+# SKILL.md format is identical, so it is installed from claude/skills/ rather
+# than duplicated), and its arm/disarm commands name
+# "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/state/edit-boundary". Without this
+# fallback the skill would arm a file this hook never reads, and the boundary
+# would be silently dead on the Copilot target: the worst possible failure for
+# a guard, since the user believes edits are frozen and they are not.
+#
+# Honoring both paths also means one "freeze" intent covers both agents on a
+# machine that has both installed, which is the behavior a human asking for a
+# freeze actually wants.
+STATE="${EDIT_BOUNDARY_FILE:-}"
+if [ -z "$STATE" ]; then
+  STATE="${COPILOT_HOME:-$HOME/.copilot}/hooks/state/edit-boundary"
+  if [ ! -f "$STATE" ]; then
+    claude_state="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/state/edit-boundary"
+    [ -f "$claude_state" ] && STATE="$claude_state"
+  fi
+fi
 
 # Not armed: allow (the common case; keep it fast). Checked before stdin is
 # even read, so an unarmed session pays almost nothing.

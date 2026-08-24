@@ -186,6 +186,24 @@ check eb5-read-outside-allowed 0 $ec '' '' "$out"
 rm -f "$ebstate"
 eb_run "$ebroot/outside.md";                       check eb6-disarmed-allows 0 $ec '' '' "$out"
 
+# State-path resolution WITHOUT the EDIT_BOUNDARY_FILE override, which every
+# case above uses and which therefore never exercises the default. The
+# edit-freeze skill is shared verbatim with the Claude target and arms the
+# CLAUDE state path, so the hook must honor that path too or the boundary is
+# silently dead on this target.
+ebhome=$(mktemp -d)
+mkdir -p "$ebhome/copilot/hooks/state" "$ebhome/claude/hooks/state"
+eb_plain() { out=$(eb_json "$1" | COPILOT_HOME="$ebhome/copilot" CLAUDE_CONFIG_DIR="$ebhome/claude" bash "$EB" 2>/dev/null); ec=$?; }
+
+eb_plain "$ebroot/outside.md";                     check eb7-neither-armed-allows 0 $ec '' '' "$out"
+printf '%s\n' "$ebroot/inside" >"$ebhome/claude/hooks/state/edit-boundary"
+eb_plain "$ebroot/outside.md";                     check_deny eb8-claude-state-honored $ec "$out"
+eb_plain "$ebroot/inside/x.md";                    check eb9-claude-state-inside-allows 0 $ec '' '' "$out"
+# The Copilot path wins when both exist.
+printf '%s\n' "$ebroot" >"$ebhome/copilot/hooks/state/edit-boundary"
+eb_plain "$ebroot/outside.md";                     check eb10-copilot-state-wins 0 $ec '' '' "$out"
+rm -rf "$ebhome"
+
 # --------------------------------------------------------------------- reread
 big="$TMPDIR_T/big.md"
 head -c 20000 /dev/zero | tr '\0' 'a' >"$big"

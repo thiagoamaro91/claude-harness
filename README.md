@@ -180,6 +180,16 @@ than no guard.
   (`github/copilot-cli` issues #2540 and #3659). An installer that works beats a
   plugin that looks installed. Revisit when those close.
 - **`log-skill-fire.sh` is not ported.** No Skill tool exists to hook.
+- **Two shared skills still name the Claude config directory.** The skills are
+  installed verbatim onto both targets, so a literal `~/.claude` path inside one
+  is not rewritten. The case that actually broke something, `edit-freeze` arming
+  a state file the Copilot hook never read, is fixed inside the Copilot hook,
+  which now honors both state paths. What remains: the `autonomous` skill's
+  ledger writes under the Claude directory rather than the Copilot one (it
+  works, it is just in the neighboring folder), and two of its reference
+  documents quote `~/.claude/skills/...` invocation paths in prose. Fixing those
+  properly means parameterizing the shared skills, which changes the Claude
+  target too, so it is left as a separate change.
 - **The settings template sets nothing active.** The permissions schema inside
   `~/.copilot/settings.json` is prose-documented only, and an unverified key
   that fails to parse is worse than an empty file. The real wiring lives in

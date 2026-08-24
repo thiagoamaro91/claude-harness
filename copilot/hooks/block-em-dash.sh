@@ -57,7 +57,11 @@ command -v perl >/dev/null 2>&1 || { echo 'em-dash: perl missing, failing open' 
 tool=$(printf '%s' "$INPUT" | jq -r '.tool_name // .toolName // empty')
 
 # New-content keys only. No old-text key belongs in this list, ever.
-CONTENT_KEYS="content file_text new_string new_str text"
+# A bare "text" key is deliberately excluded: no write tool in either harness
+# uses it as its content key, and it is generic enough to appear on unrelated
+# tools, which would draw a modifiedArgs response out of this hook on a tool it
+# has no business rewriting.
+CONTENT_KEYS="content file_text new_string new_str"
 
 # True (exit 0) when $1 contains at least one U+2014. Uses a flag + END:
 # calling `exit` mid-loop would still run END blocks, which can override the
