@@ -1,0 +1,44 @@
+{
+  "_readme": [
+    "EXAMPLE ONLY. Tier 3: this file is a reading list, not an install step.",
+    "MCP is DISABLED BY DEFAULT in GitHub organizations. An administrator has to",
+    "allowlist a server before it will run at all, so nothing here works until IT",
+    "signs off, and none of it should be copied into place before that happens.",
+    "Ask the policy question first: are agent-launched local helper processes that",
+    "make outbound network calls allowed on this machine, and does each one need a",
+    "review? Get that in writing once, then ask the per-server question in",
+    "claude/mcp.manifest.md, which explains what each server buys and what breaks",
+    "without it. Nothing in tiers 0 through 2 of this harness depends on any of them.",
+    "Placement: this shape (top-level 'mcpServers') is what the Copilot CLI and the",
+    "Agent Host read, from ~/.copilot/mcp-config.json for user scope, or from a",
+    ".mcp.json or .github/mcp.json in the repository. VS Code's own .vscode/mcp.json",
+    "uses an INCOMPATIBLE top-level key; see vscode-mcp.json.example beside this file.",
+    "Delete this _readme key before using the file for real."
+  ],
+  "mcpServers": {
+    "playwright": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "tools": ["*"]
+    },
+    "context7": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "tools": ["*"]
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "tools": ["*"]
+    },
+    "mermaid": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@peng-shawn/mermaid-mcp-server"],
+      "tools": ["*"]
+    }
+  }
+}

@@ -1,0 +1,128 @@
+// Recommended VS Code settings for GitHub Copilot with this harness.
+//
+// This is a SNIPPET, not a settings file: copy the entries you want into your
+// own settings.json (user-level) or .vscode/settings.json (workspace-level).
+// The installer never writes it, because clobbering a VS Code settings file is
+// exactly the kind of thing you want to do by hand.
+//
+// Workspace-level beats user-level for the tool-approval lists, so a repo can
+// tighten but should not silently loosen what you set at the user level.
+//
+// The approvals model has moved. An earlier draft of this file used
+// "chat.tools.edits.autoApprove", which is stale and undocumented now. The
+// current documented set is chat.permissions.default,
+// chat.tools.eligibleForAutoApproval, chat.tools.global.autoApprove,
+// chat.tools.urls.autoApprove and chat.tools.terminal.autoApprove. Confirm the
+// exact key names against the Settings UI on your VS Code build before relying
+// on any single one of them; this surface is moving quickly.
+{
+  // --- instruction files ----------------------------------------------------
+  // These gates decide whether the harness rule files are read at all, so they
+  // are the highest-value entries here. Stated explicitly rather than trusting
+  // a default that has changed before.
+
+  // Read AGENTS.md.
+  "chat.useAgentsMdFile": true,
+
+  // Read nested AGENTS.md files further down the tree, not just the root one.
+  "chat.useNestedAgentsMdFiles": true,
+
+  // Read CLAUDE.md and .claude/CLAUDE.md. This is what lets one repository
+  // serve both halves of the harness without duplicating rule files.
+  "chat.useClaudeMdFile": true,
+
+  // Where *.instructions.md files are looked up. The two harness instruction
+  // files install to ~/.copilot/instructions/, which the Agent Host reads
+  // natively; add a workspace path here if a repo ships its own.
+  "chat.instructionsFilesLocations": {
+    ".github/instructions": true
+  },
+
+  // NOT a VS Code setting, listed so you know where to look: organization-wide
+  // custom instructions are controlled server-side by
+  // github.copilot.chat.organizationInstructions.enabled. If rules appear that
+  // are in none of your files, that is where they come from.
+
+  // --- approvals: the baseline ---------------------------------------------
+
+  // Default stance for tool permissions. Keep this prompting on a work machine.
+  // The whole point of the harness is that the human stays in the loop on
+  // anything consequential.
+  "chat.permissions.default": "ask",
+
+  // Which tools are even ELIGIBLE for auto-approval. This is a better lever
+  // than a long allow list: a tool that is not eligible cannot be
+  // auto-approved by any other setting. Keep destructive-capable tools out.
+  "chat.tools.eligibleForAutoApproval": {
+    "read": true,
+    "grep": true,
+    "glob": true,
+    "view": true,
+    "shell": false,
+    "write": false,
+    "edit": false,
+    "str_replace_editor": false
+  },
+
+  // Blanket auto-approve for every tool. Leave it off. It is named here only so
+  // a future reader knows the omission was a decision.
+  "chat.tools.global.autoApprove": false,
+
+  // Auto-approval for URL fetches. Off: a fetched page is untrusted input, and
+  // an auto-approved fetch is how prompt injection arrives.
+  "chat.tools.urls.autoApprove": false,
+
+  // --- approvals: the terminal ---------------------------------------------
+
+  // The denyList mirrors the destructive-command set that
+  // block-destructive-bash.sh blocks, so a command is refused even if the hook
+  // layer is disabled or a hook times out. Copilot hook timeouts FAIL OPEN, so
+  // this is a real second line rather than belt-and-braces theater: settings do
+  // not time out.
+  //
+  // Entries are matched as regular expressions. Deny beats allow.
+  "chat.tools.terminal.autoApprove": {
+    "denyList": {
+      "/\\brm\\s+(-[a-zA-Z]*\\s+)*-?[a-zA-Z]*[rf]/": true,
+      "/\\bsudo\\b/": true,
+      "/\\bmkfs\\b/": true,
+      "/\\bdd\\s+if=/": true,
+      "/\\bgit\\s+push\\s+.*--force\\b/": true,
+      "/\\bgit\\s+reset\\s+.*--hard\\b/": true,
+      "/\\bgit\\s+clean\\s+-[a-zA-Z]*f/": true,
+      "/\\bfind\\b.*-delete\\b/": true,
+      "/\\bcurl\\b.*\\|\\s*(ba)?sh\\b/": true,
+      "/\\bwget\\b.*\\|\\s*(ba)?sh\\b/": true,
+      "/\\bchmod\\s+777\\b/": true,
+      "/\\b(psql|mysql|mariadb|sqlite3)\\b.*\\bdrop\\s+(table|database|schema)\\b/": true
+    },
+    "allowList": {
+      // Genuinely read-only commands, so the agent stops asking about them.
+      // Keep this list short; anything that writes goes through a prompt.
+      "git status": true,
+      "git diff": true,
+      "git log": true,
+      "ls": true,
+      "pwd": true
+    }
+  },
+
+  // Master switch for terminal auto-approval. With it false the lists above are
+  // inert and every command prompts, which is the safest starting point on a
+  // machine you do not control. Flip it once the deny list is proven.
+  "chat.tools.terminal.enableAutoApprove": false,
+
+  // Refuse terminal commands detected as writing to files outside the
+  // workspace. This is what now protects the guard scripts themselves: they
+  // live in ~/.copilot/hooks/, which is outside any workspace, so the agent
+  // cannot rewrite the hook that constrains it. An agent able to edit its own
+  // guards is not guarded. The default is already "outsideWorkspace"; it is
+  // spelled out because it is load-bearing here rather than incidental.
+  "chat.tools.terminal.blockDetectedFileWrites": "outsideWorkspace",
+
+  // Do NOT set this to true. VS Code ships default auto-approve rules for
+  // commands it considers safe; ignoring them means only your lists apply,
+  // which sounds stricter but in practice drops protections you did not
+  // replace.
+  "chat.tools.terminal.ignoreDefaultAutoApproveRules": false
+}

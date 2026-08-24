@@ -1,0 +1,90 @@
+// Copilot CLI user settings template (JSONC: comments are allowed here).
+//
+// Installs to ~/.copilot/settings.json. This is the ONLY Copilot CLI config
+// file that is meant to be hand-edited or templated. Two siblings in the same
+// directory are auto-managed by the CLI and must never be templated, copied,
+// or hand-edited:
+//
+//     ~/.copilot/config.json               auto-managed
+//     ~/.copilot/permissions-config.json   auto-managed
+//
+// WHY THIS FILE IS ALMOST EMPTY. The active object below sets nothing on
+// purpose. The permissions schema inside settings.json is documented in prose
+// rather than as a published schema, so every key that would be worth setting
+// here is UNVERIFIED. Shipping an unverified key as active config risks a
+// parse failure on a machine you do not control, and a settings file that
+// fails to parse is worse than one that says nothing. The harness's real
+// wiring does not live here anyway: the guard hooks are wired in
+// ~/.copilot/hooks/harness-hooks.json, which the installer writes.
+//
+// Everything below is a commented recipe. Uncomment a block only after you
+// have confirmed the key against your installed CLI version, and re-validate
+// the file afterwards.
+//
+// ---------------------------------------------------------------------------
+// UNVERIFIED (prose-documented only, confirm before enabling):
+//
+//   "disableAllHooks": false
+//       Kill switch for every hook. Leaving it unset is equivalent to false.
+//       Set it to true only to debug whether a hook is causing a problem, and
+//       put it back. Note it may be nested under "permissions" rather than
+//       top-level, depending on CLI version.
+//
+//   "permissions": {
+//     "disableBypassPermissionsMode": true
+//         Refuses the CLI's bypass-permissions mode outright. On a managed
+//         machine this is usually already forced by managed-settings.json.
+//   }
+//
+//   "sandbox": { ... }
+//       Sandboxed execution for tool calls. Shape not published; leave alone
+//       until it is.
+//
+// DELIBERATELY ABSENT, and this is a decision rather than an omission:
+//
+//   No "model" key. The organization may pin the model list, and a pinned
+//   model that this file contradicts is a confusing failure. Take whatever
+//   the account gives you and check it with /model.
+//
+//   No bypass or auto-approve mode of any kind. This machine should keep
+//   prompting for permission.
+//
+// ---------------------------------------------------------------------------
+// DENY RULES ARE COMMAND-LINE FLAGS, NOT SETTINGS KEYS.
+//
+// The Claude Code half of this harness ships a permissions.deny list in its
+// settings.json. The Copilot CLI equivalent is the --deny-tool grammar, which
+// is verified. Deny always beats allow. The grammar is:
+//
+//     shell(git commit)      one exact command
+//     shell(git:*)           a command prefix
+//     write(path)            a write to a path
+//     ServerName(tool)       an MCP tool on a named server
+//
+// The destructive-command set the Claude template denies, expressed as CLI
+// flags. Wrap this in a shell alias or a wrapper script so you do not retype
+// it, and note that it is defense in depth: the block-destructive-bash.sh
+// guard hook already covers the same ground and gives better error messages.
+//
+//     copilot \
+//       --deny-tool 'shell(rm:*)' \
+//       --deny-tool 'shell(sudo:*)' \
+//       --deny-tool 'shell(mkfs:*)' \
+//       --deny-tool 'shell(dd:*)' \
+//       --deny-tool 'shell(git push:*)' \
+//       --deny-tool 'shell(git reset:*)' \
+//       --deny-tool 'shell(git clean:*)' \
+//       --deny-tool 'write(~/.ssh)' \
+//       --deny-tool 'write(~/.bashrc)' \
+//       --deny-tool 'write(~/.zshrc)'
+//
+// Credential paths are worth denying on the READ side too, but the read-deny
+// grammar is not documented the way write() is. Until it is, the honest
+// mitigation is not to point the agent at those directories, and to keep
+// ~/.ssh, ~/.aws, ~/.config/gh, and the keychain out of any repository the
+// agent works in.
+//
+// After any edit here, validate with a JSONC-aware parser. Plain `jq` will
+// reject this file because of these comments, which is expected.
+{
+}
