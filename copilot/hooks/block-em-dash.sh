@@ -25,20 +25,32 @@
 # payload carries no rewritable content key, which covers reads, greps, and
 # shell calls at negligible cost.
 #
-# OUTPUT. Emits a top-level {"modifiedArgs": {...}} (Copilot's spelling of
-# Claude Code's hookSpecificOutput.updatedInput) with NO permissionDecision, so
-# the normal permission flow still governs the write. modifiedArgs REPLACES the
-# whole tool_input, so unchanged fields are echoed back. JSON is only honored on
-# exit 0. UNVERIFIED: whether Copilot honors modifiedArgs on a response that
-# carries no permissionDecision. If it turns out not to, the fix is to add
-# "permissionDecision":"ask", which is behavior-preserving relative to the
-# normal flow but noisier.
+# OUTPUT IS DUAL-EMITTED. The two front ends document different response
+# shapes, so the response carries both and each runtime reads the half it
+# understands. Unknown fields are ignored, so the duplication is free.
 #
-# ARGUMENT KEYS. The tool argument holding new content differs per tool and per
-# harness (Claude Code: content / new_string; text-editor-style tools:
-# file_text / new_str). Every candidate key is probed and each one present is
-# rewritten in place, so the port does not depend on an argument schema the
-# Copilot docs do not publish.
+#   CLI      top-level {"modifiedArgs": {...}}
+#   VS Code  {"hookSpecificOutput":{"hookEventName":"PreToolUse",
+#            "updatedInput":{...}}}, Claude Code's shape (VS Code's documented
+#            output fields are continue, stopReason, systemMessage and
+#            hookSpecificOutput)
+#
+# MED CONFIDENCE: that top-level modifiedArgs is CLI-only. Dual-emitting means
+# the transform does not depend on which way that resolves.
+#
+# Neither form carries a permissionDecision, so the normal permission flow still
+# governs the write. Both REPLACE the whole tool_input, so unchanged fields are
+# echoed back. JSON is only honored on exit 0. UNVERIFIED: whether a response
+# carrying no permissionDecision is honored at all; if not, the fix is to add
+# "permissionDecision":"ask", behavior-preserving relative to the normal flow
+# but noisier.
+#
+# ARGUMENT KEYS AND CASING. The argument holding new content differs per tool,
+# per harness, AND per casing: the envelope keys are snake_case but the INNER
+# tool_input properties are camelCase in VS Code (tool_input.filePath) and may
+# arrive snake_case from the CLI. Every candidate key is probed in both
+# spellings and each one present is rewritten in place, so the port depends on
+# neither an argument schema nor a casing convention the docs do not publish.
 #
 # This covers file writes only; nothing here polices the chat reply itself.
 #
@@ -56,12 +68,13 @@ command -v perl >/dev/null 2>&1 || { echo 'em-dash: perl missing, failing open' 
 
 tool=$(printf '%s' "$INPUT" | jq -r '.tool_name // .toolName // empty')
 
-# New-content keys only. No old-text key belongs in this list, ever.
+# New-content keys only, in both casings. No old-text key belongs in this list,
+# ever: that is what keeps an edit's OLD side matching the file bytes.
 # A bare "text" key is deliberately excluded: no write tool in either harness
 # uses it as its content key, and it is generic enough to appear on unrelated
-# tools, which would draw a modifiedArgs response out of this hook on a tool it
-# has no business rewriting.
-CONTENT_KEYS="content file_text new_string new_str"
+# tools, which would draw a rewrite response out of this hook on a tool it has
+# no business touching.
+CONTENT_KEYS="content file_text fileText new_string newString new_str newStr"
 
 # True (exit 0) when $1 contains at least one U+2014. Uses a flag + END:
 # calling `exit` mid-loop would still run END blocks, which can override the
@@ -81,11 +94,11 @@ de_emdash() {
   '
 }
 
-NEWARGS=$(printf '%s' "$INPUT" | jq -c '.tool_input // empty')
+NEWARGS=$(printf '%s' "$INPUT" | jq -c '.tool_input // .toolInput // empty')
 [ -n "$NEWARGS" ] || exit 0
 touched=0
 
-fpath=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // .tool_input.file // .tool_input.notebook_path // "?"')
+fpath=$(printf '%s' "$NEWARGS" | jq -r '.file_path // .filePath // .path // .file // .notebook_path // .notebookPath // "?"')
 
 # --- batch-edit form: an `edits` array of per-edit objects -------------------
 n=$(printf '%s' "$NEWARGS" | jq -r 'if (.edits | type) == "array" then (.edits | length) else 0 end' 2>/dev/null) || n=0
@@ -120,5 +133,13 @@ done
 [ "$touched" -eq 1 ] || exit 0
 
 printf '%s TRANSFORMED: em-dash rewrite :: %s (%s)\n' "$(date '+%F %T')" "$fpath" "${tool:-unknown}" >>"$LOG"
-jq -n --argjson a "$NEWARGS" '{modifiedArgs:$a}'
+# Dual-emit: modifiedArgs for the CLI, hookSpecificOutput.updatedInput for
+# VS Code. Same rewritten arguments in each, no permission decision in either.
+jq -n --argjson a "$NEWARGS" '{
+  modifiedArgs: $a,
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    updatedInput: $a
+  }
+}'
 exit 0

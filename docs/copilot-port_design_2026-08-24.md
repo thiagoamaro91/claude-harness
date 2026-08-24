@@ -35,19 +35,25 @@ files that drift apart silently.
 | Slash commands | skill invocation, `.claude/commands/` | skills with `user-invocable: true`; `.claude/commands/` also read | same |
 | Subagents | `agents/*.md`, Agent tool | `.github/agents/*.agent.md` (project), `~/.copilot/agents/*.agent.md` (user, **home wins on collision**); `/agent`, `/fleet`, `/delegate`, `--agent NAME` | additionally reads `.claude/agents/`; frontmatter also takes model, handoffs, agents, user-invocable |
 | Hook config | `settings.json` `hooks` key | `.github/hooks/*.json`, `~/.copilot/hooks/*.json`, `hooks` key in `~/.copilot/settings.json` | also reads `.claude/settings.json` and `~/.claude/settings.json` in Claude format |
-| Hook events | PreToolUse, PostToolUse, ... | sessionStart, sessionEnd, userPromptSubmitted, preToolUse, postToolUse, postToolUseFailure, preCompact, agentStop, subagentStart, subagentStop, permissionRequest (CLI only), notification (CLI only), errorOccurred | 8 events, including PreToolUse, PostToolUse, SessionStart, Stop |
-| Payload shape | snake_case on stdin | **both** camelCase and snake_case | same |
-| Allow/deny output | `hookSpecificOutput.permissionDecision` | top-level `permissionDecision` + `permissionDecisionReason` | same |
-| Argument rewrite | `hookSpecificOutput.updatedInput` | top-level `modifiedArgs` | same |
+| Hook events | PreToolUse, PostToolUse, ... | 13 events per the hooks reference: sessionStart, sessionEnd, userPromptSubmitted, preToolUse, postToolUse, postToolUseFailure, preCompact, agentStop, subagentStart, subagentStop, notification, errorOccurred and one further event. `permissionRequest` is **not** among them | 8 events, including PreToolUse, PostToolUse, SessionStart, Stop |
+| Payload envelope | snake_case on stdin | snake_case (`tool_name`, `tool_input`, `session_id`) | same |
+| Payload INNER keys | snake_case (`file_path`) | may be snake_case | **camelCase** (`tool_input.filePath`) |
+| Allow/deny output | `hookSpecificOutput.permissionDecision` | top-level `permissionDecision` + `permissionDecisionReason` | documented output fields are continue, stopReason, systemMessage, `hookSpecificOutput` (Claude-style) |
+| Argument rewrite | `hookSpecificOutput.updatedInput` | top-level `modifiedArgs` | `hookSpecificOutput.updatedInput` |
 | Matcher honored | yes | yes | **parsed but IGNORED** |
-| Permissions | `permissions.deny` in settings.json | `--allow-tool` / `--deny-tool` flags; `~/.copilot/settings.json` | `chat.tools.terminal.autoApprove`, `chat.tools.edits.autoApprove` |
+| Permissions | `permissions.deny` in settings.json | `--allow-tool` / `--deny-tool` flags; `~/.copilot/settings.json` | `chat.permissions.default`, `chat.tools.eligibleForAutoApproval`, `chat.tools.global.autoApprove`, `chat.tools.urls.autoApprove`, `chat.tools.terminal.autoApprove` |
 | MCP config | `.mcp.json` | `~/.copilot/mcp-config.json`, `.mcp.json`, `.github/mcp.json`; key `mcpServers` | `.vscode/mcp.json`; key **`servers`**, incompatible |
 | Shell tool name | `Bash` | `shell` | terminal tool |
 | Edit tool names | `Write`, `Edit`, `MultiEdit` | `write`, `edit`, `str_replace_editor`, `create` | same family |
 
-Because the payload arrives in snake_case as well as camelCase, and snake_case
-is exactly Claude Code's shape, the ported scripts keep reading `.tool_input`
-and `.session_id` unchanged. That is the one place the port was free.
+The casing split is the trap in that table. The ENVELOPE keys are snake_case in
+both front ends, so the scripts keep reading `.tool_input` and `.session_id`
+unchanged and that much of the port was free. The INNER `tool_input` properties
+are not: VS Code sends `tool_input.filePath` where Claude Code sends
+`tool_input.file_path`, and the CLI may send either. Every field the scripts
+touch is therefore read in both spellings. A guard that reads only one casing is
+a guard that silently never fires on one of the two front ends, which is
+indistinguishable from a guard that is working until the day it matters.
 
 ## What each guard hook needed
 
@@ -87,23 +93,39 @@ call still fails closed. A payload with no tool name at all fails open and says
 so in the log, because denying every unidentifiable call is worse than the risk
 it removes. `guard-edit-boundary.sh` uses the same ordering.
 
-### 3. Output contracts
+### 3. Output contracts are dual-emitted
 
-- **Block:** emit `{"permissionDecision":"deny","permissionDecisionReason":...}`
-  on stdout **and** exit 2. Exit 2 denies a `preToolUse` call outright; stdout
-  is documented to be parsed on exit 0. Emitting both means the call is refused
-  whichever way the runtime reads the response, and the reason still reaches the
-  log via stderr, exactly as the Claude originals did.
-- **Rewrite:** `{"permissionDecision":"allow","permissionDecisionReason":...,
-  "modifiedArgs":{...}}`. `modifiedArgs` replaces the whole `tool_input`, so
-  unchanged fields are echoed back. This is Copilot's spelling of
-  `hookSpecificOutput.updatedInput`.
-- **Transform without a decision:** the em-dash hook emits `modifiedArgs` alone,
-  with no `permissionDecision`, so the normal permission flow still governs the
-  write. This preserves the Claude behavior exactly and is the one contract
-  detail marked UNVERIFIED below.
+The two front ends document different response shapes. The CLI reference
+describes top-level `permissionDecision` / `permissionDecisionReason` and
+top-level `modifiedArgs`. The VS Code hooks documentation lists its output
+fields as `continue`, `stopReason`, `systemMessage` and `hookSpecificOutput`,
+which is Claude Code's shape, with a rewrite carried as `updatedInput`.
 
-### 4. Argument keys are probed, not hardcoded
+**Confidence that `modifiedArgs` is CLI-only is medium**, not high. Rather than
+bet the guard layer on which way that resolves, every response carries both
+halves. Unknown fields are ignored by both parsers, so the duplication costs
+nothing and removes the dependency entirely.
+
+- **Block:** top-level `permissionDecision: "deny"` plus
+  `permissionDecisionReason`, AND a `hookSpecificOutput` mirror carrying the
+  same decision and reason, AND exit 2. Exit 2 denies a `preToolUse` call
+  outright; stdout is documented to be parsed on exit 0. Three paths all deny,
+  so the call is refused whichever way the runtime reads the response, and the
+  reason still reaches the log via stderr exactly as the Claude originals did.
+- **Rewrite:** `permissionDecision: "allow"` plus `modifiedArgs`, AND
+  `hookSpecificOutput.updatedInput` carrying the same rewritten arguments. Both
+  forms replace the whole `tool_input`, so unchanged fields are echoed back.
+- **Transform without a decision:** the em-dash hook emits `modifiedArgs` and
+  `hookSpecificOutput.updatedInput` with no `permissionDecision` in either, so
+  the normal permission flow still governs the write. This preserves the Claude
+  behavior exactly and is the one contract detail still marked UNVERIFIED below.
+
+The smoke test asserts both halves of every rewrite and both halves of every
+deny. A response that reaches only one front end counts as a failure, not a
+partial pass: a guard that works in the CLI and not in the editor is exactly the
+kind of half-installed protection this repo exists to avoid.
+
+### 4. Argument keys are probed, in both casings
 
 The Copilot docs name the tools but do not publish their argument schemas.
 `str_replace_editor` follows the text-editor convention, which uses `old_str`,
@@ -112,18 +134,23 @@ The Copilot docs name the tools but do not publish their argument schemas.
 it works and silently no-ops, or worse, writes a `modifiedArgs` object the tool
 cannot read.
 
-Every script therefore probes a candidate list and writes back to whichever key
-it found:
+The casing makes it worse. The envelope is snake_case, but the inner
+`tool_input` properties are camelCase in VS Code and may be snake_case from the
+CLI, so each candidate key has two spellings.
+
+Every script therefore probes a candidate list in both casings and writes back
+to whichever key it found:
 
 | What | Keys probed |
 |---|---|
-| shell command | `command`, `cmd`, `script`, `shellCommand` |
-| new content | `content`, `file_text`, `new_string`, `new_str`, `text` |
-| file path | `file_path`, `path`, `file`, `notebook_path` |
-| targeted read | `offset`, `limit`, `view_range`, `range`, `start_line`, `end_line` |
+| shell command | `command`, `cmd`, `script`, `shellCommand`, `shell_command`, `commandLine`, `command_line` |
+| new content | `content`, `file_text`, `fileText`, `new_string`, `newString`, `new_str`, `newStr` |
+| file path | `file_path`, `filePath`, `path`, `file`, `notebook_path`, `notebookPath` |
+| targeted read | `offset`, `limit`, `view_range`, `viewRange`, `range`, `start_line`, `startLine`, `end_line`, `endLine` |
+| envelope | `tool_input`, `toolInput` |
 
-The old-text keys (`old_string`, `old_str`) are deliberately absent from the
-content list. That is what keeps the em-dash transform from corrupting an edit
+The old-text keys (`old_string`, `oldString`, `old_str`, `oldStr`) are
+deliberately absent from the content list, in every casing. That is what keeps the em-dash transform from corrupting an edit
 whose whole purpose is to remove an existing em-dash from a file, and it is now
 structural rather than a special case in the code.
 
@@ -215,6 +242,46 @@ ported into something that never fires.
 organizations and an administrator has to allowlist each server. Tier 3 stays
 what it always was: a reading list.
 
+## Platform deltas worth knowing before you touch this again
+
+Facts from a second research pass that do not change the port but change what a
+future reader should assume.
+
+**Both harnesses can run inside VS Code.** The Session Target dropdown selects
+between Local, Copilot, Claude, Codex and Cloud, and the Claude side is gated by
+`github.copilot.chat.claudeAgent.enabled`. Separately, the organization's
+"Third-party coding agents" policy toggles Anthropic Claude on its own. So
+"Copilot is the only license" and "Claude Code cannot run here" are different
+statements, and the second needs checking rather than assuming.
+
+**Enterprise settings can kill the plugin path outright.** Managed settings
+carry `enabledPlugins` and `strictKnownMarketplaces`, which an administrator can
+use to restrict plugins to an approved marketplace list or disable them. That is
+independent support for the no-plugin-in-v1 decision: even once
+`github/copilot-cli` #2540 and #3659 close, the plugin route may simply not be
+open on this machine, whereas an installer copying files into a home directory
+is not policy-gated in the same way.
+
+**Instruction and skill portability is narrower than it looks.**
+
+- The portable `SKILL.md` frontmatter subset is just `name` and `description`.
+  `name` must be lowercase letters, digits and hyphens, at most 64 characters;
+  `description` at most 1024 characters. `allowed-tools` is CLI-only.
+  `user-invocable` and `context` are VS Code-only. All seven shared skills were
+  checked against these limits and all seven pass unchanged, the longest
+  description being 958 characters.
+- `~/.claude/rules/` scopes with a `paths:` key, not the `applyTo:` key that
+  `*.instructions.md` uses. Do not copy frontmatter between the two formats.
+- `*.chatmode.md` is deprecated. Nothing here uses it; noted so nobody
+  reintroduces it.
+- The Agent Host does not read VS Code profile user-data customizations, which
+  is a legacy location. Anything that must reach the Agent Host goes in the
+  documented file locations, which is what the installer targets.
+
+**MCP:** `.vscode/mcp.json` additionally supports a top-level `sandbox` key,
+which has no counterpart in the `mcpServers` shape. One more reason the two
+example files in `copilot/mcp/` are not interchangeable.
+
 ## UNVERIFIED
 
 Everything below is prose-documented, inferred, or environment-specific. None of
@@ -223,10 +290,16 @@ it is load-bearing for tiers 0 through 2, and each item names how to settle it.
 1. **Exact argument schemas of the Copilot tools.** Mitigated by key probing
    rather than resolved. Settle it by running one call of each tool with a
    logging `postToolUse` hook and reading the payload.
-2. **Whether `modifiedArgs` is honored without an accompanying
-   `permissionDecision`.** The em-dash transform depends on it. If it turns out
-   not to be, the fix is to add `"permissionDecision":"ask"`, which is
-   behavior-preserving relative to the normal flow but noisier.
+2. **Whether a rewrite is honored without an accompanying
+   `permissionDecision`.** The em-dash transform depends on it, in both emitted
+   forms. If it turns out not to be, the fix is to add
+   `"permissionDecision":"ask"` to both, which is behavior-preserving relative
+   to the normal flow but noisier.
+   Related and also open: **which rewrite contract each front end actually
+   reads.** Medium confidence that `modifiedArgs` is CLI-only and that
+   `hookSpecificOutput.updatedInput` is the VS Code form. Mitigated by
+   dual-emitting both rather than resolved. Settle it by watching whether a
+   rewrite takes effect in each front end.
 3. **The exact permissions schema inside `~/.copilot/settings.json`.** Prose
    documentation only, which is why the shipped template sets nothing active and
    puts every candidate key in a comment marked UNVERIFIED.
@@ -253,6 +326,14 @@ documentation, principally:
   instruction files, MCP configuration, and CLI permission flags
 - `github.com/github/copilot-cli` issues #2540 and #3659 (plugin hook
   regression, plugin command path resolution)
-- VS Code documentation for `chat.useAgentsMdFile`, `chat.useClaudeMdFile`,
-  `chat.instructionsFilesLocations`, `chat.tools.terminal.autoApprove`, and
-  `chat.tools.edits.autoApprove`
+- `code.visualstudio.com/docs/agent-customization/hooks` (VS Code hook output
+  fields, matcher behavior, inner-key casing)
+- `code.visualstudio.com/docs/agent-customization/custom-agents`,
+  `/custom-instructions`, `/mcp-servers`
+- `code.visualstudio.com/docs/agents/run/approvals` (`chat.permissions.default`,
+  `chat.tools.eligibleForAutoApproval`, `chat.tools.global.autoApprove`,
+  `chat.tools.urls.autoApprove`, `chat.tools.terminal.autoApprove`)
+- `code.visualstudio.com/docs/agents/agent-harnesses` (Session Target,
+  `github.copilot.chat.claudeAgent.enabled`)
+- `docs.github.com/en/copilot/reference/enterprise-administrators/enterprise-managed-settings`
+  (`enabledPlugins`, `strictKnownMarketplaces`)

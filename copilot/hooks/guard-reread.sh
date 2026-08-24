@@ -12,16 +12,21 @@
 # shell call against the read ledger. The tool name is checked first, jq-free,
 # and anything outside the read family exits 0 immediately.
 #
-# DECISION OUTPUT. A block emits {"permissionDecision":"deny",
-# "permissionDecisionReason":...} on stdout and also exits 2, so the read is
-# refused whichever contract the runtime reads. The reason is the whole point of
-# this guard (it tells the model what to do instead), so it is emitted on both
-# stdout and stderr.
+# DECISION OUTPUT IS DUAL-EMITTED. A block emits the top-level CLI contract
+# {"permissionDecision":"deny","permissionDecisionReason":...} AND the VS Code
+# form {"hookSpecificOutput":{...}} in Claude Code's shape, then exits 2, so the
+# read is refused whichever contract the runtime reads. MED CONFIDENCE that the
+# two front ends need different shapes; dual-emitting removes the dependency.
+# The reason is the whole point of this guard (it tells the model what to do
+# instead), so it goes to stdout and stderr both.
 #
-# ARGUMENT KEYS. The path and the targeted-read arguments are probed across the
-# spellings the two harnesses use (file_path / path / file, and offset / limit /
-# view_range) rather than hardcoded. Missing the targeted-read bypass would be
-# the expensive failure here: it would block legitimate partial reads.
+# ARGUMENT KEYS AND CASING. The path and the targeted-read arguments are probed
+# across the spellings the two harnesses use (file_path / path / file, and
+# offset / limit / view_range) AND both casings, because the envelope is
+# snake_case while the INNER tool_input properties are camelCase in VS Code
+# (tool_input.filePath) and may arrive snake_case from the CLI. Missing the
+# targeted-read bypass would be the expensive failure here: it would refuse
+# legitimate partial reads of a large file.
 #
 # Fails OPEN throughout (missing jq, unreadable state dir): this guard saves
 # tokens, and no token-economics rule is worth hard-stopping a session over.
@@ -58,14 +63,17 @@ SID=$(printf '%s' "$INPUT" | jq -r '.session_id // .sessionId // empty')
 SID="${SID//[^a-zA-Z0-9_-]/}"
 [ -z "$SID" ] && exit 0
 
-FP=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // .tool_input.file // empty')
+TI=$(printf '%s' "$INPUT" | jq -c '.tool_input // .toolInput // empty')
+[ -n "$TI" ] || exit 0
+
+FP=$(printf '%s' "$TI" | jq -r '.file_path // .filePath // .path // .file // empty')
 [ -z "$FP" ] && exit 0
 [ -f "$FP" ] || exit 0
 
 # Targeted reads are always fine. view_range is the text-editor-style spelling
 # of the same intent and must bypass too, or partial reads get refused.
-TARGETED=$(printf '%s' "$INPUT" | jq -r '
-  if (.tool_input.offset // .tool_input.limit // .tool_input.view_range // .tool_input.range // .tool_input.start_line // .tool_input.end_line) != null
+TARGETED=$(printf '%s' "$TI" | jq -r '
+  if (.offset // .limit // .view_range // .viewRange // .range // .start_line // .startLine // .end_line // .endLine) != null
   then "y" else "" end')
 [ -n "$TARGETED" ] && exit 0
 
@@ -88,7 +96,7 @@ PREV=$(grep -F "${FP}|" "$LOG" 2>/dev/null | tail -1 | awk -F'|' '{print $2}')
 
 if [ -n "$PREV" ] && [ "$PREV" = "$MTIME" ]; then
   msg="BLOCKED by guard-reread (token economics): '$FP' ($(( SIZE / 1024 ))KB) was already fully read this session and has not changed. It is still in your context. Re-reading it re-bills the whole file on every subsequent turn. If you need a specific region, read with an offset/limit or a line range; if you need analysis over it, delegate to a subagent."
-  jq -n --arg r "$msg" '{permissionDecision:"deny",permissionDecisionReason:$r}'
+  jq -n --arg r "$msg" '{permissionDecision:"deny",permissionDecisionReason:$r,hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   echo "$msg" >&2
   exit 2
 fi

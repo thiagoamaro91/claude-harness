@@ -1,4 +1,32 @@
 {
+  "_comment": [
+    "Harness guard hooks. Installed by bin/install-copilot.sh to",
+    "~/.copilot/hooks/harness-hooks.json with __COPILOT_HOME__ substituted.",
+    "This _comment key is documentation only; JSON has no comment syntax and",
+    "unknown keys are ignored. Delete it if your CLI version ever objects.",
+    "",
+    "The 'bash' key is used rather than the generic 'command' key. A hook entry",
+    "takes mutually exclusive bash / powershell / command keys, and an explicit",
+    "per-platform key wins over the generic one, so naming 'bash' says exactly",
+    "what these scripts are.",
+    "",
+    "WINDOWS GAP: v1 ships bash only. A Windows port adds a 'powershell' key",
+    "beside each 'bash' key below, pointing at a PowerShell 7+ twin of the same",
+    "script, like this:",
+    "    { \"type\": \"command\",",
+    "      \"bash\": \"__COPILOT_HOME__/hooks/block-destructive-bash.sh\",",
+    "      \"powershell\": \"__COPILOT_HOME__/hooks/block-destructive-bash.ps1\",",
+    "      \"timeoutSec\": 10 }",
+    "No .ps1 twins exist yet, so on Windows these guards do not fire at all.",
+    "",
+    "timeoutSec is 10. Do NOT lower it: a hook timeout FAILS OPEN, so a shorter",
+    "timeout makes a guard more likely to be skipped, not stricter.",
+    "",
+    "The matchers below are honored by the CLI. VS Code parses them and then",
+    "ignores them, firing every hook on every tool call, so each script also",
+    "self-filters on tool_name. The matchers stay because the double filter",
+    "costs nothing and the CLI does use them."
+  ],
   "hooks": {
     "preToolUse": [
       {

@@ -117,6 +117,11 @@ Per tier:
   The second form tests the installed copies rather than the repo copies.
   Then merge `copilot/vscode-settings.snippet.jsonc` into your VS Code settings
   by hand. That is not optional if you use VS Code: see the known gaps below.
+  The snippet covers the instruction-file gates (`chat.useAgentsMdFile`,
+  `chat.useClaudeMdFile`, `chat.useNestedAgentsMdFiles`), which decide whether
+  the harness rule files are read at all, and the approvals set
+  (`chat.permissions.default`, `chat.tools.eligibleForAutoApproval`,
+  `chat.tools.terminal.autoApprove` and friends).
 - **Tier 3** prints a reading list and copies nothing. Work through it with IT.
 
 Set `COPILOT_HOME` (or pass `--config-dir`) if your config lives somewhere other
@@ -171,6 +176,16 @@ than no guard.
   not be lowered. Treat the hooks as a safety net and use the VS Code deny lists
   in `copilot/vscode-settings.snippet.jsonc` as the second line, since those do
   not time out.
+- **The two front ends want different hook response shapes.** The CLI documents
+  top-level `permissionDecision` and `modifiedArgs`; VS Code documents
+  Claude-style `hookSpecificOutput`. Confidence on that split is only medium, so
+  every guard emits BOTH forms in one response and lets each runtime read the
+  half it understands. Unknown fields are ignored, so the duplication is free.
+- **VS Code sends camelCase inner tool arguments.** The payload envelope is
+  snake_case in both front ends, but the inner `tool_input` properties are
+  camelCase in VS Code (`tool_input.filePath`) and may be snake_case from the
+  CLI. Every guard reads both spellings; a guard reading one casing would
+  silently never fire on the other front end.
 - **Hooks are a Preview feature.** The contract can change under you. The smoke
   test is the canary: run it after any Copilot upgrade.
 - **Windows is not covered.** Hook objects accept `bash` and `powershell` keys

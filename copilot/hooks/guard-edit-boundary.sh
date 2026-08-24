@@ -30,13 +30,19 @@
 # missing-jq fail-closed branch, which otherwise would deny every tool call in
 # the session on a jq-less machine rather than only the writes this guard owns.
 #
-# DECISION OUTPUT. A block emits {"permissionDecision":"deny",
-# "permissionDecisionReason":...} on stdout and also exits 2, so the call is
-# refused whichever contract the runtime reads, with the reason on stderr.
+# DECISION OUTPUT IS DUAL-EMITTED. A block emits the top-level CLI contract
+# {"permissionDecision":"deny","permissionDecisionReason":...} AND the VS Code
+# form {"hookSpecificOutput":{...}} in Claude Code's shape, then exits 2. Every
+# path denies, so the call is refused whichever contract the runtime reads, with
+# the reason on stderr. MED CONFIDENCE that the two front ends need different
+# shapes; dual-emitting removes the dependency on that resolving either way.
 #
-# ARGUMENT KEYS. The file path is probed across the spellings the two harnesses
-# use (file_path, path, file, notebook_path) rather than hardcoded, because the
-# Copilot docs name the write tools but do not publish their argument schema.
+# ARGUMENT KEYS AND CASING. The file path is probed across the spellings the two
+# harnesses use (file_path, path, file, notebook_path) AND both casings, because
+# the envelope is snake_case while the INNER tool_input properties are camelCase
+# in VS Code (tool_input.filePath) and may arrive snake_case from the CLI. The
+# Copilot docs name the write tools but publish neither their argument schema
+# nor a casing guarantee.
 
 LOG="${GUARD_LOG:-${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log}"
 
@@ -88,7 +94,7 @@ esac
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "$(date '+%F %T') guard-edit-boundary: jq missing, failing closed" >>"$LOG"
-  printf '%s\n' '{"permissionDecision":"deny","permissionDecisionReason":"jq missing, cannot verify edit boundary (failing closed)"}'
+  printf '%s\n' '{"permissionDecision":"deny","permissionDecisionReason":"jq missing, cannot verify edit boundary (failing closed)","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"jq missing, cannot verify edit boundary (failing closed)"}}'
   echo 'BLOCKED: jq missing, cannot verify edit boundary (failing closed)' >&2
   exit 2
 fi
@@ -96,7 +102,7 @@ fi
 IFS= read -r BOUNDARY <"$STATE" || BOUNDARY=""
 [ -n "$BOUNDARY" ] || exit 0
 
-FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // .tool_input.file // .tool_input.notebook_path // empty')
+FILE=$(printf '%s' "$INPUT" | jq -r '(.tool_input // .toolInput // {}) | .file_path // .filePath // .path // .file // .notebook_path // .notebookPath // empty')
 # No file path in the input: not a file edit we can judge; allow.
 [ -n "$FILE" ] || exit 0
 
@@ -115,7 +121,7 @@ case "/$FILE/" in
   */../*)
     printf '%s BLOCKED: edit-boundary unresolved-traversal %s :: %s\n' "$(date '+%F %T')" "$BOUNDARY" "$FILE" >>"$LOG"
     msg="$FILE has an unresolved '..' component and cannot be verified against the edit boundary ($BOUNDARY). Create the parent directory or pass a fully resolved path."
-    jq -n --arg r "$msg" '{permissionDecision:"deny",permissionDecisionReason:$r}'
+    jq -n --arg r "$msg" '{permissionDecision:"deny",permissionDecisionReason:$r,hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
     echo "BLOCKED: $msg" >&2
     exit 2 ;;
 esac
@@ -131,6 +137,6 @@ esac
 
 printf '%s BLOCKED: edit-boundary %s :: %s\n' "$(date '+%F %T')" "$BOUNDARY" "$FILE" >>"$LOG"
 msg="$FILE is outside the armed edit boundary ($BOUNDARY). If this edit is intentional, disarm first: command rm \"${STATE}\""
-jq -n --arg r "$msg" '{permissionDecision:"deny",permissionDecisionReason:$r}'
+jq -n --arg r "$msg" '{permissionDecision:"deny",permissionDecisionReason:$r,hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 echo "BLOCKED: $msg" >&2
 exit 2

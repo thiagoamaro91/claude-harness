@@ -33,23 +33,34 @@
 # machine must not have every single tool call in the session denied, only the
 # shell calls this guard actually owns.
 #
-# DECISION OUTPUT. A block emits the top-level Copilot contract
-# {"permissionDecision":"deny","permissionDecisionReason":...} on stdout AND
-# exits 2. Both paths deny: exit 2 is documented to deny a preToolUse call
-# outright, and stdout is documented to be parsed on exit 0. Emitting both means
-# the call is refused whichever way the runtime reads it, and the human-readable
-# reason still reaches the log via stderr.
+# DECISION OUTPUT IS DUAL-EMITTED. The two front ends document different
+# response shapes, so every response carries BOTH and lets each runtime read the
+# half it understands. Unknown fields are ignored, so the duplication is free.
 #
-# A rewrite emits {"permissionDecision":"allow","permissionDecisionReason":...,
-# "modifiedArgs":{...}} where modifiedArgs REPLACES the whole tool_input, so
-# unchanged fields are echoed back (this is Copilot's spelling of what Claude
-# Code calls hookSpecificOutput.updatedInput).
+#   CLI      top-level "permissionDecision" / "permissionDecisionReason", plus
+#            top-level "modifiedArgs" for a rewrite.
+#   VS Code  "hookSpecificOutput" in Claude Code's shape (VS Code's documented
+#            output fields are continue, stopReason, systemMessage and
+#            hookSpecificOutput); a rewrite goes in as updatedInput.
 #
-# ARGUMENT KEYS. The command lives under different keys depending on which tool
-# fired (Claude Code's Bash uses .command; Copilot's shell tool is documented by
-# name but not by argument schema). The key is probed rather than hardcoded, and
-# the rewrite is written back to whichever key was found. UNVERIFIED: the exact
-# argument key of Copilot's shell tool.
+# MED CONFIDENCE: that top-level modifiedArgs is CLI-only and that VS Code needs
+# the hookSpecificOutput form. Dual-emitting means the port does not depend on
+# which way that resolves.
+#
+# A block additionally exits 2. Exit 2 is documented to deny a preToolUse call
+# outright, and stdout is documented to be parsed on exit 0, so emitting both
+# means the call is refused whichever way the runtime reads the response, with
+# the human-readable reason still reaching the log via stderr.
+#
+# Both rewrite forms REPLACE the whole tool_input, so unchanged fields are
+# echoed back.
+#
+# ARGUMENT KEYS AND CASING. The envelope keys are snake_case, but the INNER
+# tool_input properties are camelCase in VS Code (tool_input.filePath) and may
+# arrive snake_case from the CLI. Every field is read in both spellings, and the
+# command key itself is probed rather than hardcoded, with any rewrite written
+# back to whichever key was found. UNVERIFIED: the exact argument key and casing
+# of Copilot's shell tool, which is why this is probed rather than assumed.
 #
 # SPEED. Hook timeouts ALWAYS FAIL OPEN in Copilot, so a slow guard is a silent
 # hole. Nothing here does I/O beyond reading stdin and appending one log line.
@@ -87,16 +98,23 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 0
   fi
   echo "$(date '+%F %T') block-destructive-bash: jq missing, failing closed" >>"$LOG"
-  printf '%s\n' '{"permissionDecision":"deny","permissionDecisionReason":"jq missing, cannot verify command safely (failing closed)"}'
+  # Hand-written rather than built with jq, for obvious reasons. Dual-emitted
+  # like every other decision in this script.
+  printf '%s\n' '{"permissionDecision":"deny","permissionDecisionReason":"jq missing, cannot verify command safely (failing closed)","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"jq missing, cannot verify command safely (failing closed)"}}'
   echo 'BLOCKED: jq missing, cannot verify command safely (failing closed)' >&2
   exit 2
 fi
 
-# Probe for the command key rather than hardcoding one, and remember which key
-# matched so a rewrite is written back to the same place.
+# Normalize the envelope once. The envelope key is snake_case in both front
+# ends, but read the camelCase spelling too rather than betting on it.
+TI=$(printf '%s' "$INPUT" | jq -c '.tool_input // .toolInput // empty')
+[ -n "$TI" ] || exit 0
+
+# Probe for the command key rather than hardcoding one, in both casings, and
+# remember which key matched so a rewrite is written back to the same place.
 CMDKEY=""
-for k in command cmd script shellCommand; do
-  v=$(printf '%s' "$INPUT" | jq -r --arg k "$k" '.tool_input[$k] // empty')
+for k in command cmd script shellCommand shell_command commandLine command_line; do
+  v=$(printf '%s' "$TI" | jq -r --arg k "$k" '.[$k] // empty')
   if [ -n "$v" ]; then CMDKEY="$k"; CMD="$v"; break; fi
 done
 [ -n "$CMDKEY" ] || exit 0
@@ -121,7 +139,16 @@ logline() {
 
 block() {
   logline BLOCKED "$1"
-  jq -n --arg r "$1" '{permissionDecision:"deny",permissionDecisionReason:$r}'
+  # Dual-emit: top-level for the CLI, hookSpecificOutput for VS Code.
+  jq -n --arg r "$1" '{
+    permissionDecision: "deny",
+    permissionDecisionReason: $r,
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $r
+    }
+  }'
   echo "BLOCKED: $1" >&2
   exit 2
 }
@@ -235,10 +262,21 @@ EOF_S
           print out
         }')
         if [ "$newcmd" != "$TRASH_CMD" ]; then
-          NEWARGS=$(printf '%s' "$INPUT" | jq -c --arg k "$CMDKEY" --arg cmd "$newcmd" '.tool_input | .[$k] = $cmd')
+          NEWARGS=$(printf '%s' "$TI" | jq -c --arg k "$CMDKEY" --arg cmd "$newcmd" '.[$k] = $cmd')
           logline REWRITTEN "rm -> $newcmd"
-          jq -n --argjson a "$NEWARGS" --arg cmd "$newcmd" \
-            '{permissionDecision:"allow",permissionDecisionReason:("rm -rf rewritten to: "+$cmd),modifiedArgs:$a}'
+          # Dual-emit: modifiedArgs for the CLI, hookSpecificOutput.updatedInput
+          # for VS Code. Same rewritten args in each.
+          jq -n --argjson a "$NEWARGS" --arg cmd "$newcmd" '{
+            permissionDecision: "allow",
+            permissionDecisionReason: ("rm -rf rewritten to: " + $cmd),
+            modifiedArgs: $a,
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse",
+              permissionDecision: "allow",
+              permissionDecisionReason: ("rm -rf rewritten to: " + $cmd),
+              updatedInput: $a
+            }
+          }'
           exit 0
         fi
       fi

@@ -25,8 +25,11 @@ EM=$(printf '\xe2\x80\x94')   # U+2014, built at runtime so this file stays clea
 pass=0; fail=0; skip=0
 
 # check NAME WANT_EXIT GOT_EXIT JQPATH EXPECT STDOUT
-#   JQPATH '' means stdout must be empty; otherwise it is a path under
-#   .modifiedArgs that must equal EXPECT.
+#   JQPATH '' means stdout must be empty; otherwise it is a path under the
+#   rewritten arguments that must equal EXPECT. Rewrites are DUAL-EMITTED, so
+#   the same value is asserted under BOTH .modifiedArgs (CLI contract) and
+#   .hookSpecificOutput.updatedInput (VS Code contract). A rewrite that reaches
+#   only one front end is a failure, not a partial pass.
 check() {
   local name=$1 want=$2 got=$3 path=$4 expect=$5 out=$6
   if [ "$got" != "$want" ]; then
@@ -35,20 +38,25 @@ check() {
   if [ -z "$path" ]; then
     if [ -n "$out" ]; then echo "FAIL $name: expected empty stdout, got: $out"; fail=$((fail+1)); return; fi
   else
-    local actual
-    actual=$(printf '%s' "$out" | jq -r ".modifiedArgs${path}" 2>/dev/null)
-    if [ "$actual" != "$expect" ]; then
-      echo "FAIL $name: modifiedArgs$path = [$actual], wanted [$expect]"; fail=$((fail+1)); return
+    local a b
+    a=$(printf '%s' "$out" | jq -r ".modifiedArgs${path}" 2>/dev/null)
+    b=$(printf '%s' "$out" | jq -r ".hookSpecificOutput.updatedInput${path}" 2>/dev/null)
+    if [ "$a" != "$expect" ]; then
+      echo "FAIL $name: modifiedArgs$path = [$a], wanted [$expect]"; fail=$((fail+1)); return
+    fi
+    if [ "$b" != "$expect" ]; then
+      echo "FAIL $name: hookSpecificOutput.updatedInput$path = [$b], wanted [$expect]"; fail=$((fail+1)); return
     fi
   fi
   pass=$((pass+1))
 }
 
 # check_deny NAME GOT_EXIT STDOUT
-#   A block must exit 2 AND emit the top-level Copilot deny contract, so the
-#   call is refused whichever way the runtime reads the response.
+#   A block must exit 2 AND emit BOTH deny contracts: the top-level CLI form and
+#   the VS Code hookSpecificOutput mirror. Every path must deny, so the call is
+#   refused whichever way the runtime reads the response.
 check_deny() {
-  local name=$1 got=$2 out=$3 decision
+  local name=$1 got=$2 out=$3 decision mirror
   if [ "$got" != "2" ]; then
     echo "FAIL $name: exit $got, wanted 2"; fail=$((fail+1)); return
   fi
@@ -56,8 +64,15 @@ check_deny() {
   if [ "$decision" != "deny" ]; then
     echo "FAIL $name: permissionDecision = [$decision], wanted [deny]"; fail=$((fail+1)); return
   fi
+  mirror=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision' 2>/dev/null)
+  if [ "$mirror" != "deny" ]; then
+    echo "FAIL $name: hookSpecificOutput.permissionDecision = [$mirror], wanted [deny]"; fail=$((fail+1)); return
+  fi
   if [ -z "$(printf '%s' "$out" | jq -r '.permissionDecisionReason // empty' 2>/dev/null)" ]; then
     echo "FAIL $name: empty permissionDecisionReason"; fail=$((fail+1)); return
+  fi
+  if [ -z "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty' 2>/dev/null)" ]; then
+    echo "FAIL $name: empty hookSpecificOutput.permissionDecisionReason"; fail=$((fail+1)); return
   fi
   pass=$((pass+1))
 }
@@ -241,6 +256,42 @@ do
   done
 done
 rm -f "$ebstate"
+
+# ------------------------------------------------- camelCase inner tool_input
+# The ENVELOPE keys are snake_case, but VS Code sends the INNER tool_input
+# properties in camelCase (tool_input.filePath) while the CLI may send them
+# snake_case. Every guard must fire identically on both spellings; reading only
+# one is a guard that silently never triggers on the other front end.
+out=$(jq -n '{tool_name:"shell",tool_input:{command:"git reset --hard HEAD~1"}}' | bash "$D" 2>/dev/null); ec=$?
+check_deny cc1-shell-snake $ec "$out"
+
+out=$(jq -n --arg c "a${EM}b" '{tool_name:"write",tool_input:{filePath:"/tmp/t.md",content:$c}}' | bash "$E" 2>/dev/null); ec=$?
+check cc2-emdash-camel-path 0 $ec '.content' 'a, b' "$out"
+out=$(jq -n --arg c "a${EM}b" '{tool_name:"create",tool_input:{filePath:"/tmp/t.md",fileText:$c}}' | bash "$E" 2>/dev/null); ec=$?
+check cc3-emdash-fileText 0 $ec '.fileText' 'a, b' "$out"
+out=$(jq -n --arg o "old ${EM} text" --arg n "new${EM}text" \
+  '{tool_name:"str_replace_editor",tool_input:{filePath:"/tmp/t.md",oldStr:$o,newStr:$n}}' | bash "$E" 2>/dev/null); ec=$?
+check cc4-emdash-newStr 0 $ec '.newStr' 'new, text' "$out"
+check cc5-emdash-oldStr-untouched 0 $ec '.oldStr' "old ${EM} text" "$out"
+out=$(jq -n --arg c "a${EM}b" '{tool_name:"edit",tool_input:{filePath:"/tmp/t.md",newString:$c}}' | bash "$E" 2>/dev/null); ec=$?
+check cc6-emdash-newString 0 $ec '.newString' 'a, b' "$out"
+
+printf '%s\n' "$ebroot/inside" >"$ebstate"
+out=$(jq -n --arg f "$ebroot/outside.md" '{tool_name:"edit",tool_input:{filePath:$f,oldStr:"a",newStr:"b"}}' \
+  | EDIT_BOUNDARY_FILE="$ebstate" bash "$EB" 2>/dev/null); ec=$?
+check_deny cc7-boundary-camel-path $ec "$out"
+rm -f "$ebstate"
+
+bigc="$TMPDIR_T/bigcamel.md"
+head -c 20000 /dev/zero | tr '\0' 'b' >"$bigc"
+CSID="camel$$"
+out=$(jq -n --arg f "$bigc" --arg s "$CSID" '{session_id:$s,tool_name:"read",tool_input:{filePath:$f}}' | bash "$RR" 2>/dev/null); ec=$?
+check cc8-reread-camel-first 0 $ec '' '' "$out"
+out=$(jq -n --arg f "$bigc" --arg s "$CSID" '{session_id:$s,tool_name:"read",tool_input:{filePath:$f}}' | bash "$RR" 2>/dev/null); ec=$?
+check_deny cc9-reread-camel-blocked $ec "$out"
+out=$(jq -n --arg f "$bigc" --arg s "$CSID" '{session_id:$s,tool_name:"view",tool_input:{filePath:$f,viewRange:[1,20]}}' | bash "$RR" 2>/dev/null); ec=$?
+check cc10-reread-camel-viewRange-bypasses 0 $ec '' '' "$out"
+rm -f "${TMPDIR:-/tmp}/copilot-reads-$(id -u)/reads-${CSID}" 2>/dev/null
 
 rm -rf "$ebroot"
 echo "----"
