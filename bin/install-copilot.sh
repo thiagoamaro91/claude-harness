@@ -124,6 +124,9 @@ install_one() { # $1 = repo-relative source, $2 = config-dir-relative dest
     rm -f "$dst.harness-tmp"
     cp "$src" "$dst" || return 1
   fi
+  # Only .sh gets the execute bit. The .ps1 twins deliberately do not need it:
+  # they are invoked as `pwsh -NoProfile -File <path>`, which does not consult
+  # the execute bit, and on Windows the bit has no meaning at all.
   case "$1" in
     *.sh) chmod +x "$dst" ;;
   esac
@@ -177,9 +180,15 @@ if [ "$TIER" -ge 2 ]; then
 
   say ""
   say "install-copilot: hooks are wired in $CONFIG_DIR/hooks/harness-hooks.json,"
-  say "  not in settings.json. Verify the install with:"
+  say "  not in settings.json. Each entry carries a bash path AND a powershell"
+  say "  path, so the same config drives the .sh guards on macOS/Linux and the"
+  say "  .ps1 twins on Windows. The twins need PowerShell 7+ (pwsh) on PATH;"
+  say "  Windows PowerShell 5.1 is NOT enough. Verify the install with:"
   say ""
   say "    HOOKS_DIR=$CONFIG_DIR/hooks bash copilot/hooks/tests/test-copilot-guards-smoke.sh"
+  say ""
+  say "  That suite runs every case against BOTH twins. It skips the PowerShell"
+  say "  half if no pwsh is found; set PWSH_BIN to point at one."
   say ""
   say "  Hooks are a Preview feature and hook TIMEOUTS FAIL OPEN, so treat the"
   say "  guards as a safety net, not as a wall. The VS Code deny lists in"

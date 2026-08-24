@@ -99,6 +99,11 @@ authored|9|copilot/hooks/block-destructive-bash.sh|-
 authored|9|copilot/hooks/block-em-dash.sh|-
 authored|9|copilot/hooks/guard-edit-boundary.sh|-
 authored|9|copilot/hooks/guard-reread.sh|-
+authored|9|copilot/hooks/block-destructive-bash.ps1|-
+authored|9|copilot/hooks/block-em-dash.ps1|-
+authored|9|copilot/hooks/guard-edit-boundary.ps1|-
+authored|9|copilot/hooks/guard-reread.ps1|-
+authored|9|copilot/hooks/lib/recycle.ps1|-
 authored|9|copilot/hooks/harness-hooks.template.json|-
 authored|9|copilot/hooks/tests/test-copilot-guards-smoke.sh|-
 authored|9|copilot/settings.work.template.json|-

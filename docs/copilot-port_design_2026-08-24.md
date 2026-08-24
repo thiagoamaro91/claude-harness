@@ -226,11 +226,8 @@ commands resolved against the current working directory instead of the plugin
 root. A plugin whose hooks do not fire is worse than an installer, because it
 looks installed. Revisit when both issues close.
 
-**No PowerShell hook twins.** Copilot hook objects accept `bash` and
-`powershell` keys side by side, so a Windows port is a matter of writing the
-second half of each hook object rather than changing any architecture. v1 ships
-bash only. On Windows the guards simply do not fire, which is a real gap and is
-stated as one in the README rather than papered over.
+**PowerShell twins: shipped.** This was listed as a v1 non-goal and is now
+done, because the work machine turned out to be Windows. See the section below.
 
 **`log-skill-fire.sh` is not ported.** It hooks `PostToolUse` on the `Skill`
 tool. Copilot has no Skill tool: skills trigger from their description or from a
@@ -281,6 +278,72 @@ is not policy-gated in the same way.
 **MCP:** `.vscode/mcp.json` additionally supports a top-level `sandbox` key,
 which has no counterpart in the `mcpServers` shape. One more reason the two
 example files in `copilot/mcp/` are not interchangeable.
+
+## PowerShell twins
+
+Each guard now ships twice: `<name>.sh` and `<name>.ps1`. The `.ps1` files are
+behavioral twins, not ports in the loose sense. Same three-tier destructive
+policy, same em-dash rules in the same order, same boundary logic including the
+Claude state-path fallback, same reread ledger, same dual-emitted contracts,
+same self-filter-before-anything ordering. Every hook entry in
+`harness-hooks.json` carries both a `bash` and a `powershell` path, and Copilot
+picks per platform, so one config file drives both.
+
+They require **PowerShell 7+**. Windows PowerShell 5.1 is a different product
+and will not run them: they use `$IsWindows`, which 5.1 does not define, and
+rely on PowerShell 7 JSON handling.
+
+### What the rewrite tier does without a `trash` CLI
+
+Windows ships no trash command, so tier 2 rewrites to a bundled helper,
+`hooks/lib/recycle.ps1`, invoked as
+`pwsh -NoProfile -File <hooks>/lib/recycle.ps1 <targets>`. It sends each path to
+the Recycle Bin through `Microsoft.VisualBasic.FileIO.FileSystem`.
+
+A separate file rather than an inline `-Command` string, deliberately: the
+rewritten command is executed by whatever shell Copilot spawns, and an inline
+PowerShell one-liner would carry nested quoting and `$` sigils whose survival
+depends on whether that shell is pwsh, cmd.exe or Git Bash. The guard cannot
+verify that from inside. Rewriting to a plain `-File` invocation keeps the
+emitted command quoting-free and mirrors exactly how the POSIX twin rewrites to
+an external binary. `$env:HARNESS_TRASH_CMD` overrides the helper in both twins.
+
+With neither a helper nor an override the tier BLOCKS rather than rewriting,
+which is the same safe direction the POSIX twin takes when no trash binary is on
+PATH.
+
+### PowerShell gotchas this port had to handle
+
+| Gotcha | Consequence if missed | Handling |
+|---|---|---|
+| `ConvertTo-Json` defaults to depth 2 | nested `tool_input` silently serialized as `"System.Collections.Hashtable"`, corrupting the rewrite | `-Depth 20` on every emit, with a round-trip test asserting a nested/array/null/bool/number payload survives byte-identically |
+| `Microsoft.VisualBasic` loads on non-Windows | an availability check based on `Add-Type` alone reports success, then `SendToRecycleBin` throws at runtime | gate on `$IsWindows` **and** the `Add-Type` result |
+| String comparison is case-insensitive by default | wrong for exact matching | explicit `StringComparison` on the boundary match; see the case note below |
+| Pipeline stringification adds trailing newlines | a file's final newline silently changes on transform | `[Console]::In.ReadToEnd()` plus `[regex]::Replace`, which preserve them exactly; the trailing-newline test case is the canary |
+| `perl -pe` loops per line, .NET does not | the line-start em-dash rule would fire once per payload instead of once per line | `RegexOptions.Multiline` on rule 1 |
+| POSIX bracket classes do not exist in .NET | `[[:space:]]` matches literal characters, so patterns silently never fire | every pattern transliterated to `\s` / `[a-zA-Z0-9]`, in single-quoted strings so PowerShell's backtick and `$` cannot touch them |
+| Payload paths may use either separator | a backslash path misses a forward-slash allowlist pattern | both sides normalized to forward slashes before matching |
+| `Test-Path` without `-LiteralPath` treats `[` as a wildcard | a real filename containing brackets silently no-ops | `-LiteralPath` throughout |
+| `Set-StrictMode` plus dynamic property access | throws on any absent key | not used in the hooks; a `Get-Prop` helper returns `$null` for absent keys |
+
+### One deliberate behavioral difference
+
+Boundary path comparison is **case-insensitive in the `.ps1` twin and
+case-sensitive in the `.sh` twin**. That is correct on each platform rather than
+a porting slip: Windows filesystems are case-insensitive, POSIX ones are not. It
+is the only place the twins do not agree, and it is invisible on the test suite
+because the suite uses consistent casing.
+
+### What remains Windows-unverified
+
+The recycle path itself. `recycle.ps1` refuses to run off Windows by design, so
+on macOS the suite asserts the BLOCK fallback instead, which is the behavior
+that actually protects the user. Needs a real Windows box to confirm: that
+`Microsoft.VisualBasic` loads there, that `DeleteDirectory`/`DeleteFile` with
+`SendToRecycleBin` behave as expected, and that the rewritten command string
+survives whatever shell Copilot spawns. Everything else, including every block,
+every allow, every self-filter and the full round-trip fidelity of
+`modifiedArgs`, is exercised on both twins by the standard suite.
 
 ## UNVERIFIED
 
