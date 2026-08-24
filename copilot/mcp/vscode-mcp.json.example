@@ -1,0 +1,38 @@
+{
+  "_readme": [
+    "EXAMPLE ONLY. Tier 3: this file is a reading list, not an install step.",
+    "MCP is DISABLED BY DEFAULT in GitHub organizations. An administrator has to",
+    "allowlist a server before it will run, so nothing here works until IT signs off.",
+    "Read claude/mcp.manifest.md for what each server buys and what breaks without it.",
+    "This is the VS Code shape, for .vscode/mcp.json. It uses the top-level key",
+    "'servers' (plus an optional 'inputs' array), which is INCOMPATIBLE with the",
+    "'mcpServers' key the Copilot CLI and Agent Host read. The two files are not",
+    "interchangeable, which is the single most common way to lose an afternoon here.",
+    "Prefer the portable form: put a .mcp.json at the repository root using the",
+    "mcpServers shape (see mcp.json.example beside this file), which the Agent Host",
+    "reads natively, and keep this VS Code file only if you need a VS Code-only server.",
+    "Delete this _readme key before using the file for real."
+  ],
+  "servers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "mermaid": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@peng-shawn/mermaid-mcp-server"]
+    }
+  }
+}

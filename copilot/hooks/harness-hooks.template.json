@@ -1,0 +1,46 @@
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "shell|bash|run_command|run_in_terminal|execute_command|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "bash": "__COPILOT_HOME__/hooks/block-destructive-bash.sh",
+            "timeoutSec": 10
+          }
+        ]
+      },
+      {
+        "matcher": "write|edit|create|str_replace|str_replace_editor|apply_patch|insert_edit_into_file|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "bash": "__COPILOT_HOME__/hooks/block-em-dash.sh",
+            "timeoutSec": 10
+          }
+        ]
+      },
+      {
+        "matcher": "write|edit|create|create_file|str_replace|str_replace_editor|apply_patch|insert_edit_into_file|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "bash": "__COPILOT_HOME__/hooks/guard-edit-boundary.sh",
+            "timeoutSec": 10
+          }
+        ]
+      },
+      {
+        "matcher": "read|view|read_file|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "bash": "__COPILOT_HOME__/hooks/guard-reread.sh",
+            "timeoutSec": 10
+          }
+        ]
+      }
+    ]
+  }
+}

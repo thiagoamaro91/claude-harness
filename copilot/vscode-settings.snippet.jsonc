@@ -1,0 +1,84 @@
+// Recommended VS Code settings for GitHub Copilot with this harness.
+//
+// This is a SNIPPET, not a settings file: copy the entries you want into your
+// own settings.json (user-level) or .vscode/settings.json (workspace-level).
+// The installer never writes it, because clobbering a VS Code settings file is
+// exactly the kind of thing you want to do by hand.
+//
+// Workspace-level beats user-level for the tool-approval lists, so a repo can
+// tighten but should not silently loosen what you set at the user level.
+{
+  // --- instruction files ----------------------------------------------------
+
+  // Read AGENTS.md. On by default in recent builds; stated explicitly so the
+  // harness does not depend on a default that could change.
+  "chat.useAgentsMdFile": true,
+
+  // Read CLAUDE.md and .claude/CLAUDE.md. This is what lets one repository
+  // serve both halves of the harness without duplicating rule files.
+  "chat.useClaudeMdFile": true,
+
+  // Where *.instructions.md files are looked up. The two harness instruction
+  // files install to ~/.copilot/instructions/, which the Agent Host reads
+  // natively; add a workspace path here if a repo ships its own.
+  "chat.instructionsFilesLocations": {
+    ".github/instructions": true
+  },
+
+  // --- terminal auto-approval ----------------------------------------------
+
+  // The denyList mirrors the destructive-command set that
+  // block-destructive-bash.sh blocks, so a command is refused even if the
+  // hook layer is disabled or a hook times out (Copilot hook timeouts FAIL
+  // OPEN, so this is a real second line, not belt-and-braces theater).
+  //
+  // Entries are matched as regular expressions. Deny beats allow.
+  "chat.tools.terminal.autoApprove": {
+    "/\\brm\\s+(-[a-zA-Z]*\\s+)*-?[a-zA-Z]*[rf]/": false,
+    "/\\bsudo\\b/": false,
+    "/\\bmkfs\\b/": false,
+    "/\\bdd\\s+if=/": false,
+    "/\\bgit\\s+push\\s+.*--force\\b/": false,
+    "/\\bgit\\s+reset\\s+.*--hard\\b/": false,
+    "/\\bgit\\s+clean\\s+-[a-zA-Z]*f/": false,
+    "/\\bfind\\b.*-delete\\b/": false,
+    "/\\bcurl\\b.*\\|\\s*(ba)?sh\\b/": false,
+    "/\\bwget\\b.*\\|\\s*(ba)?sh\\b/": false,
+    "/\\bchmod\\s+777\\b/": false,
+    "/\\b(psql|mysql|mariadb|sqlite3)\\b.*\\bdrop\\s+(table|database|schema)\\b/": false,
+
+    // Safe read-only commands worth auto-approving so the agent stops asking.
+    // Keep this list short and genuinely read-only; anything that writes goes
+    // through a prompt.
+    "git status": true,
+    "git diff": true,
+    "git log": true,
+    "ls": true,
+    "pwd": true
+  },
+
+  // --- edit auto-approval ---------------------------------------------------
+
+  // The agent must never be able to edit its own guard scripts or hook wiring:
+  // an agent that can rewrite the hook that constrains it is not constrained.
+  // These exclusions are the single most important entry in this file.
+  "chat.tools.edits.autoApprove": {
+    "**": true,
+    "**/.github/hooks/**": false,
+    "**/.copilot/hooks/**": false,
+    "**/.claude/hooks/**": false,
+    "**/.github/copilot-instructions.md": false,
+    "**/.github/instructions/**": false,
+    "**/AGENTS.md": false,
+    "**/CLAUDE.md": false,
+    "**/.vscode/settings.json": false,
+    "**/.vscode/mcp.json": false
+  }
+
+  // --- deliberately NOT set -------------------------------------------------
+  //
+  // "chat.tools.autoApprove" is experimental and approves EVERY tool call,
+  // including terminal commands, bypassing both lists above. Do not enable it
+  // on a work machine. It is named here only so that a future reader knows the
+  // omission was a decision.
+}
