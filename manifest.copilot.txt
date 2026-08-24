@@ -1,0 +1,87 @@
+# claude-harness sync manifest, GitHub Copilot target
+#
+# Same pipe format as manifest.txt: kind|tier|repo-path|live-path
+#
+#   kind      shared    the file is reused verbatim from the claude/ tree. The
+#                       skill format is identical across the two harnesses, so
+#                       skills are installed from claude/skills/, never
+#                       duplicated into copilot/.
+#             authored  written for the Copilot target, lives under copilot/.
+#   tier      lowest install tier that includes the file (bin/install-copilot.sh
+#             --tier N installs every row with tier <= N). Tier 3 rows are
+#             printed, not copied.
+#   live-path relative to the Copilot config dir ($COPILOT_HOME, default
+#             ~/.copilot). "-" means the file never leaves the repo.
+#
+# Read ONLY by bin/install-copilot.sh. The sync scripts (bin/export.sh,
+# bin/import.sh) read manifest.txt and ignore this file entirely, because the
+# Copilot config directory has no live counterpart to diff against at home.
+# Every file listed here also carries a row in manifest.txt, which stays the
+# repo-wide allowlist.
+
+# --- tier 0: core rules as Copilot instruction files ---
+authored|0|copilot/instructions/harness-core.instructions.md|instructions/harness-core.instructions.md
+authored|0|copilot/instructions/dispatch.instructions.md|instructions/dispatch.instructions.md
+
+# --- tier 1: skills and the custom agent (markdown only, nothing executes) ---
+# Skills come straight from the claude/ tree: the SKILL.md format is the same.
+# The autonomous skill's executable helpers are marked tier 2 on their own rows,
+# exactly as in manifest.txt, so they install with the hooks and not with the
+# markdown.
+shared|2|claude/skills/autonomous/references/ledger/append.py|skills/autonomous/references/ledger/append.py
+shared|2|claude/skills/autonomous/references/ledger/test_append.py|skills/autonomous/references/ledger/test_append.py
+shared|1|claude/skills/autonomous/references/marathon.md|skills/autonomous/references/marathon.md
+shared|2|claude/skills/autonomous/references/marathon/run.sh|skills/autonomous/references/marathon/run.sh
+shared|2|claude/skills/autonomous/references/marathon/test-driver.sh|skills/autonomous/references/marathon/test-driver.sh
+shared|1|claude/skills/autonomous/references/produce-heads.md|skills/autonomous/references/produce-heads.md
+shared|1|claude/skills/autonomous/references/quality-gates.md|skills/autonomous/references/quality-gates.md
+shared|2|claude/skills/autonomous/references/workflows/_shim.mjs|skills/autonomous/references/workflows/_shim.mjs
+shared|2|claude/skills/autonomous/references/workflows/_shim.test.mjs|skills/autonomous/references/workflows/_shim.test.mjs
+shared|2|claude/skills/autonomous/references/workflows/build-sdd.js|skills/autonomous/references/workflows/build-sdd.js
+shared|2|claude/skills/autonomous/references/workflows/build-sdd.test.mjs|skills/autonomous/references/workflows/build-sdd.test.mjs
+shared|2|claude/skills/autonomous/references/workflows/candidates.js|skills/autonomous/references/workflows/candidates.js
+shared|2|claude/skills/autonomous/references/workflows/candidates.test.mjs|skills/autonomous/references/workflows/candidates.test.mjs
+shared|2|claude/skills/autonomous/references/workflows/panel.js|skills/autonomous/references/workflows/panel.js
+shared|2|claude/skills/autonomous/references/workflows/panel.test.mjs|skills/autonomous/references/workflows/panel.test.mjs
+shared|1|claude/skills/autonomous/references/workflows/README.md|skills/autonomous/references/workflows/README.md
+shared|2|claude/skills/autonomous/references/workflows/recon.js|skills/autonomous/references/workflows/recon.js
+shared|2|claude/skills/autonomous/references/workflows/recon.test.mjs|skills/autonomous/references/workflows/recon.test.mjs
+shared|1|claude/skills/autonomous/SKILL.md|skills/autonomous/SKILL.md
+shared|1|claude/skills/edit-freeze/SKILL.md|skills/edit-freeze/SKILL.md
+shared|1|claude/skills/expert-panel/references/architect.md|skills/expert-panel/references/architect.md
+shared|1|claude/skills/expert-panel/references/data-architect.md|skills/expert-panel/references/data-architect.md
+shared|1|claude/skills/expert-panel/references/dev-lead.md|skills/expert-panel/references/dev-lead.md
+shared|1|claude/skills/expert-panel/references/MANIFEST-TEMPLATE.md|skills/expert-panel/references/MANIFEST-TEMPLATE.md
+shared|1|claude/skills/expert-panel/references/product-owner.md|skills/expert-panel/references/product-owner.md
+shared|1|claude/skills/expert-panel/SKILL.md|skills/expert-panel/SKILL.md
+shared|1|claude/skills/forcing-questions/SKILL.md|skills/forcing-questions/SKILL.md
+shared|1|claude/skills/graphify/references/add-watch.md|skills/graphify/references/add-watch.md
+shared|1|claude/skills/graphify/references/exports.md|skills/graphify/references/exports.md
+shared|1|claude/skills/graphify/references/extraction-spec.md|skills/graphify/references/extraction-spec.md
+shared|1|claude/skills/graphify/references/github-and-merge.md|skills/graphify/references/github-and-merge.md
+shared|1|claude/skills/graphify/references/hooks.md|skills/graphify/references/hooks.md
+shared|1|claude/skills/graphify/references/query.md|skills/graphify/references/query.md
+shared|1|claude/skills/graphify/references/transcribe.md|skills/graphify/references/transcribe.md
+shared|1|claude/skills/graphify/references/update.md|skills/graphify/references/update.md
+shared|1|claude/skills/graphify/SKILL.md|skills/graphify/SKILL.md
+shared|1|claude/skills/humanizer/LICENSE|skills/humanizer/LICENSE
+shared|1|claude/skills/humanizer/SKILL.md|skills/humanizer/SKILL.md
+shared|1|claude/skills/spec-diagram/references/palette.md|skills/spec-diagram/references/palette.md
+shared|1|claude/skills/spec-diagram/references/syntax-gotchas.md|skills/spec-diagram/references/syntax-gotchas.md
+shared|1|claude/skills/spec-diagram/references/tool-landscape.md|skills/spec-diagram/references/tool-landscape.md
+shared|1|claude/skills/spec-diagram/SKILL.md|skills/spec-diagram/SKILL.md
+authored|1|copilot/agents/web-verifier.agent.md|agents/web-verifier.agent.md
+
+# --- tier 2: guard hooks, hook wiring, and the settings template ---
+authored|2|copilot/hooks/block-destructive-bash.sh|hooks/block-destructive-bash.sh
+authored|2|copilot/hooks/block-em-dash.sh|hooks/block-em-dash.sh
+authored|2|copilot/hooks/guard-edit-boundary.sh|hooks/guard-edit-boundary.sh
+authored|2|copilot/hooks/guard-reread.sh|hooks/guard-reread.sh
+authored|2|copilot/hooks/harness-hooks.template.json|hooks/harness-hooks.json
+authored|2|copilot/hooks/tests/test-copilot-guards-smoke.sh|hooks/tests/test-copilot-guards-smoke.sh
+authored|2|copilot/settings.work.template.json|-
+
+# --- tier 3: optional MCP layer and the VS Code snippet, print only ---
+authored|3|copilot/mcp/mcp.json.example|-
+authored|3|copilot/mcp/vscode-mcp.json.example|-
+authored|3|copilot/vscode-settings.snippet.jsonc|-

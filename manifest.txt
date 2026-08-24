@@ -82,6 +82,31 @@ authored|2|claude/settings.work.template.json|-
 authored|3|claude/mcp.manifest.md|-
 authored|3|claude/plugins.manifest.md|-
 
+# --- the GitHub Copilot target ---
+# These rows exist so this manifest stays the repo-wide allowlist: every
+# tracked file has a row. They are all tier 9 with live-path "-", so
+# bin/install.sh never copies them into the Claude config dir and the sync
+# scripts skip them (those walk "sync" rows only). What installs them is
+# bin/install-copilot.sh, driven by manifest.copilot.txt, into the Copilot
+# config dir instead. Skills are NOT duplicated for that target: the Copilot
+# manifest points straight at the claude/skills rows above.
+authored|9|manifest.copilot.txt|-
+authored|9|bin/install-copilot.sh|-
+authored|9|copilot/instructions/harness-core.instructions.md|-
+authored|9|copilot/instructions/dispatch.instructions.md|-
+authored|9|copilot/agents/web-verifier.agent.md|-
+authored|9|copilot/hooks/block-destructive-bash.sh|-
+authored|9|copilot/hooks/block-em-dash.sh|-
+authored|9|copilot/hooks/guard-edit-boundary.sh|-
+authored|9|copilot/hooks/guard-reread.sh|-
+authored|9|copilot/hooks/harness-hooks.template.json|-
+authored|9|copilot/hooks/tests/test-copilot-guards-smoke.sh|-
+authored|9|copilot/settings.work.template.json|-
+authored|9|copilot/vscode-settings.snippet.jsonc|-
+authored|9|copilot/mcp/mcp.json.example|-
+authored|9|copilot/mcp/vscode-mcp.json.example|-
+authored|9|docs/copilot-port_design_2026-08-24.md|-
+
 # --- repo infrastructure: never installed ---
 authored|9|README.md|-
 authored|9|manifest.txt|-
