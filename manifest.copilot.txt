@@ -77,6 +77,11 @@ authored|2|copilot/hooks/block-destructive-bash.sh|hooks/block-destructive-bash.
 authored|2|copilot/hooks/block-em-dash.sh|hooks/block-em-dash.sh
 authored|2|copilot/hooks/guard-edit-boundary.sh|hooks/guard-edit-boundary.sh
 authored|2|copilot/hooks/guard-reread.sh|hooks/guard-reread.sh
+authored|2|copilot/hooks/block-destructive-bash.ps1|hooks/block-destructive-bash.ps1
+authored|2|copilot/hooks/block-em-dash.ps1|hooks/block-em-dash.ps1
+authored|2|copilot/hooks/guard-edit-boundary.ps1|hooks/guard-edit-boundary.ps1
+authored|2|copilot/hooks/guard-reread.ps1|hooks/guard-reread.ps1
+authored|2|copilot/hooks/lib/recycle.ps1|hooks/lib/recycle.ps1
 authored|2|copilot/hooks/harness-hooks.template.json|hooks/harness-hooks.json
 authored|2|copilot/hooks/tests/test-copilot-guards-smoke.sh|hooks/tests/test-copilot-guards-smoke.sh
 authored|2|copilot/settings.work.template.json|-

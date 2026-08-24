@@ -5,19 +5,15 @@
     "This _comment key is documentation only; JSON has no comment syntax and",
     "unknown keys are ignored. Delete it if your CLI version ever objects.",
     "",
-    "The 'bash' key is used rather than the generic 'command' key. A hook entry",
-    "takes mutually exclusive bash / powershell / command keys, and an explicit",
-    "per-platform key wins over the generic one, so naming 'bash' says exactly",
-    "what these scripts are.",
+    "Each hook entry carries BOTH a 'bash' and a 'powershell' key. They are",
+    "mutually exclusive per platform and the explicit per-platform key wins over",
+    "the generic 'command' key, so Windows runs the .ps1 twin and macOS/Linux run",
+    "the .sh original from the same config file. The two are behavioral twins:",
+    "same policy, same dual-emitted contracts, same self-filtering.",
     "",
-    "WINDOWS GAP: v1 ships bash only. A Windows port adds a 'powershell' key",
-    "beside each 'bash' key below, pointing at a PowerShell 7+ twin of the same",
-    "script, like this:",
-    "    { \"type\": \"command\",",
-    "      \"bash\": \"__COPILOT_HOME__/hooks/block-destructive-bash.sh\",",
-    "      \"powershell\": \"__COPILOT_HOME__/hooks/block-destructive-bash.ps1\",",
-    "      \"timeoutSec\": 10 }",
-    "No .ps1 twins exist yet, so on Windows these guards do not fire at all.",
+    "The .ps1 twins need PowerShell 7+ (pwsh) on PATH. Windows PowerShell 5.1 is",
+    "NOT enough: they rely on $IsWindows and on ConvertFrom-Json behavior that",
+    "5.1 does not provide.",
     "",
     "timeoutSec is 10. Do NOT lower it: a hook timeout FAILS OPEN, so a shorter",
     "timeout makes a guard more likely to be skipped, not stricter.",
@@ -35,6 +31,7 @@
           {
             "type": "command",
             "bash": "__COPILOT_HOME__/hooks/block-destructive-bash.sh",
+            "powershell": "__COPILOT_HOME__/hooks/block-destructive-bash.ps1",
             "timeoutSec": 10
           }
         ]
@@ -45,6 +42,7 @@
           {
             "type": "command",
             "bash": "__COPILOT_HOME__/hooks/block-em-dash.sh",
+            "powershell": "__COPILOT_HOME__/hooks/block-em-dash.ps1",
             "timeoutSec": 10
           }
         ]
@@ -55,6 +53,7 @@
           {
             "type": "command",
             "bash": "__COPILOT_HOME__/hooks/guard-edit-boundary.sh",
+            "powershell": "__COPILOT_HOME__/hooks/guard-edit-boundary.ps1",
             "timeoutSec": 10
           }
         ]
@@ -65,6 +64,7 @@
           {
             "type": "command",
             "bash": "__COPILOT_HOME__/hooks/guard-reread.sh",
+            "powershell": "__COPILOT_HOME__/hooks/guard-reread.ps1",
             "timeoutSec": 10
           }
         ]

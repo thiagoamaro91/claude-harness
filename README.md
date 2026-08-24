@@ -114,7 +114,10 @@ Per tier:
   bash copilot/hooks/tests/test-copilot-guards-smoke.sh
   HOOKS_DIR=~/.copilot/hooks bash copilot/hooks/tests/test-copilot-guards-smoke.sh
   ```
-  The second form tests the installed copies rather than the repo copies.
+  The second form tests the installed copies rather than the repo copies. Every
+  case runs twice, once against the `.sh` guard and once against its `.ps1`
+  twin; the PowerShell half is skipped with a notice if no `pwsh` is found, and
+  `PWSH_BIN=/path/to/pwsh` points it at one.
   Then merge `copilot/vscode-settings.snippet.jsonc` into your VS Code settings
   by hand. That is not optional if you use VS Code: see the known gaps below.
   The snippet covers the instruction-file gates (`chat.useAgentsMdFile`,
@@ -127,6 +130,52 @@ Per tier:
 Set `COPILOT_HOME` (or pass `--config-dir`) if your config lives somewhere other
 than `~/.copilot`. The installer substitutes `__COPILOT_HOME__` and
 `__CLAUDE_HOME__` in every installed file with the real directory.
+
+## Windows install
+
+The installer is a bash script, which is not a problem: it only copies files and
+substitutes a path placeholder. Two ways to run it.
+
+**Option A, Git Bash or WSL.** Clone and run it exactly as on any other machine.
+Point it at the Windows home so the files land where Copilot looks:
+
+```bash
+COPILOT_HOME="$USERPROFILE/.copilot" ./bin/install-copilot.sh --tier 2
+```
+
+Under WSL, `$USERPROFILE` is not set; use `/mnt/c/Users/<you>/.copilot` instead.
+Check the result with `--dry-run` first, as always.
+
+**Option B, copy by hand.** Nothing here needs an installer. Recreate this
+layout under `%USERPROFILE%\.copilot\`:
+
+```
+%USERPROFILE%\.copilot\
+  instructions\        <- copilot/instructions/*.instructions.md
+  skills\              <- claude/skills/**
+  agents\              <- copilot/agents/web-verifier.agent.md
+  hooks\               <- copilot/hooks/*.sh and *.ps1
+  hooks\lib\           <- copilot/hooks/lib/recycle.ps1
+  hooks\harness-hooks.json  <- copilot/hooks/harness-hooks.template.json
+```
+
+Then edit `harness-hooks.json` and replace every `__COPILOT_HOME__` with the
+real path (the forward-slash form of your profile path, for example
+`C:/Users/<you>/.copilot`). Forward slashes are fine here and avoid JSON
+escaping headaches; backslashes must be doubled if you use them.
+
+**Either way:**
+
+- **PowerShell 7+ must be on PATH.** Check with `pwsh -v`. Windows PowerShell
+  5.1 is a different product and will not run these guards.
+- The hook config is identical on every platform. Each entry names both a
+  `bash` and a `powershell` script, and Copilot picks the right one.
+- Verify with the smoke test. It runs from Git Bash or WSL and exercises both
+  twins:
+  ```bash
+  HOOKS_DIR="$USERPROFILE/.copilot/hooks" PWSH_BIN=pwsh \
+    bash copilot/hooks/tests/test-copilot-guards-smoke.sh
+  ```
 
 ## First-run detection on the work box
 
@@ -188,8 +237,20 @@ than no guard.
   silently never fire on the other front end.
 - **Hooks are a Preview feature.** The contract can change under you. The smoke
   test is the canary: run it after any Copilot upgrade.
-- **Windows is not covered.** Hook objects accept `bash` and `powershell` keys
-  side by side, but v1 ships bash only. On Windows the guards do not fire.
+- **Windows is covered, and needs PowerShell 7+.** Each guard ships as a
+  `.sh` original and a `.ps1` twin with identical policy, and every hook entry
+  carries both a `bash` and a `powershell` path, so one config file drives both
+  platforms. The twins require `pwsh` 7 or newer on PATH: Windows PowerShell
+  5.1 is not enough, because they rely on `$IsWindows` and on PowerShell 7 JSON
+  behavior. With no `pwsh`, the guards do not fire on Windows.
+- **The Recycle Bin rewrite is not yet verified on real Windows.** On
+  macOS/Linux the destructive guard rewrites `rm -rf` to a `trash` CLI. On
+  Windows there is no such command, so it rewrites to a bundled
+  `hooks/lib/recycle.ps1` helper instead. The block, allow and self-filter paths
+  are all covered by the test suite on any platform, but the recycle path itself
+  can only be exercised on Windows; until it is, treat that one tier as
+  unverified. Its failure direction is safe: with no working recycle mechanism
+  the guard BLOCKS rather than rewriting, and that fallback IS tested.
 - **No plugin packaging.** Agent Plugins 1.0 would bundle all of this into one
   installable unit, but plugin-shipped hooks are currently broken
   (`github/copilot-cli` issues #2540 and #3659). An installer that works beats a
@@ -302,8 +363,9 @@ claude/
 copilot/
   instructions/               the two core documents as *.instructions.md (tier 0)
   agents/web-verifier.agent.md  the same subagent, Copilot format (tier 1)
-  hooks/                      4 ported guards + smoke test (tier 2)
-  hooks/harness-hooks.template.json  hook wiring, __COPILOT_HOME__ substituted
+  hooks/                      4 ported guards, .sh + .ps1 twins, + smoke test (tier 2)
+  hooks/lib/recycle.ps1       Windows Recycle Bin helper the rewrite tier calls
+  hooks/harness-hooks.template.json  hook wiring (bash + powershell paths)
   settings.work.template.json ~/.copilot/settings.json template (tier 2)
   vscode-settings.snippet.jsonc  VS Code settings to merge by hand (tier 3)
   mcp/                        two MCP example files, incompatible shapes (tier 3)
