@@ -400,3 +400,53 @@ documentation, principally:
   `github.copilot.chat.claudeAgent.enabled`)
 - `docs.github.com/en/copilot/reference/enterprise-administrators/enterprise-managed-settings`
   (`enabledPlugins`, `strictKnownMarketplaces`)
+
+## Addendum, 2026-08-25: the Claude target also runs on a Copilot-only Windows box
+
+Two things learned after this document was written, both of which change which
+installer runs first on a work machine that has a Copilot license and no Claude
+Code license.
+
+**1. The Copilot-hosted Claude coding agent loads the full `~/.claude` tree.**
+It is built on the Claude Agent SDK, billed to Copilot, and driven from VS Code,
+and in daily use it picks up the `CLAUDE.md` rules, `~/.claude/skills`, the
+`settings.json` hooks, and the `agents/*.md` subagents. This is observed
+behavior, not a documented guarantee: the mapping table above was built from
+vendor documentation, and both vendors are silent on this. Treat it as it is
+written here, something confirmed in use that could change without notice.
+
+The consequence for this repo: `bin/install.sh` is the PRIMARY install on such
+a box, and the Copilot port documented above becomes the fallback that covers
+Copilot CLI and the non-Claude models. Nothing in the port changes; what changes
+is the install order in the README.
+
+**2. Tier 2 of the Claude target needed a Windows wiring, and now has one.**
+Tiers 0, 1 and 3 are markdown and already worked through Git Bash or WSL. Tier 2
+did not: `claude/settings.work.template.json` wires each guard as a bare `.sh`
+path, and which shell the agent spawns a hook command through on Windows is
+undocumented. If it is not Git Bash, those guards silently never fire.
+
+`claude/settings.work.windows.template.json` wires the same four guards as
+`pwsh -NoProfile -File "__CLAUDE_HOME__/hooks/<name>.ps1"` (script path quoted:
+a profile directory with a space in it would split an unquoted one, and a guard
+wired to a split path never fires), using the very same
+PowerShell twins this document specified for the Copilot target. They were
+written to be reusable that way: they self-filter on both tool-name families,
+read both inner-key casings, and dual-emit the Claude contract alongside the
+Copilot CLI's top-level keys, so no policy change was needed to adopt them here.
+Two adjustments were needed:
+
+- The twins resolved `guard.log` and the edit-boundary state file against
+  `~/.copilot`. They now resolve against the directory the script is installed
+  in first, falling back to the old `COPILOT_HOME` and `CLAUDE_CONFIG_DIR`
+  chain. Under `~/.copilot/hooks` every path resolves exactly as before.
+- `manifest.txt` rows have no platform column, so the kind carries it: the five
+  `.ps1` rows are now `authored-win`, and `bin/install.sh --windows` is the only
+  reader that installs them. `bin/export.sh` and `bin/import.sh` walk `sync`
+  rows only and are unaffected; `guard/scan.sh` never reads the manifest.
+
+`log-skill-fire` has no PowerShell twin, so the Windows template carries no
+`PostToolUse` block. That hook only appends a line to a log, so nothing
+protective is missing. The Recycle Bin rewrite tier stays unverified on real
+Windows, exactly as the known-gaps section of the README says: it is the same
+helper script, and only a real Windows box can settle it.

@@ -60,7 +60,21 @@
 # Fails OPEN if jq or perl is missing: a missing dependency must not hard-stop
 # every write in the session; one em-dash slipping through is recoverable.
 
-LOG="${GUARD_LOG:-${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log}"
+# Log path, resolved in order: the GUARD_LOG override (the test suite points it
+# at a temp file), the directory this script is INSTALLED IN, then the Copilot
+# config dir. The script-dir step is what lets one twin serve both targets:
+# under <copilot>/hooks it resolves to exactly the same guard.log as before,
+# and under <claude>/hooks (the Windows install of the Claude target, see
+# bin/install.sh --windows) it logs beside the Claude guards instead of into a
+# .copilot tree that may not exist on that machine at all.
+HOOK_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd -P) || HOOK_DIR=""
+if [ -n "${GUARD_LOG:-}" ]; then
+  LOG="$GUARD_LOG"
+elif [ -n "$HOOK_DIR" ]; then
+  LOG="$HOOK_DIR/guard.log"
+else
+  LOG="${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log"
+fi
 INPUT=$(cat)
 
 command -v jq   >/dev/null 2>&1 || { echo 'em-dash: jq missing, failing open'   >&2; exit 0; }

@@ -2,6 +2,7 @@
 # bin/install.sh - install the harness onto a work machine.
 #
 #   ./bin/install.sh --tier N [--dry-run] [--config-dir DIR]
+#                    [--windows | --no-windows]
 #
 # Tiers are cumulative:
 #   0  core rule markdown only. Nothing executable, nothing wired.
@@ -21,6 +22,22 @@
 # instructions are printed. If none exists, the template is installed as
 # settings.json directly.
 #
+# WINDOWS. Tiers 0, 1 and 3 are markdown and need nothing special. Tier 2 does:
+# the POSIX template wires each guard as a bare .sh path, and which shell the
+# agent spawns a hook command through on Windows is undocumented, so a guard
+# wired that way may silently never fire. With --windows, tier 2 additionally
+# installs the PowerShell 7 twins (the manifest's authored-win rows) and uses
+# claude/settings.work.windows.template.json, which invokes each guard as
+# pwsh -NoProfile -File "<config-dir>/hooks/<name>.ps1", script path quoted so
+# a profile directory with a space in it cannot split it. The .sh guards are
+# installed too: they are harmless, and Git Bash may well run them.
+#
+# --windows is auto-detected from $OS=Windows_NT or from a MINGW/MSYS/CYGWIN
+# uname (Git Bash), and the script prints which signal triggered it. Pass
+# --windows to force it on, --no-windows to force it off. It needs PowerShell 7
+# or newer (pwsh) on PATH; Windows PowerShell 5.1 is a different product and is
+# NOT enough. The installer checks and prints the version it finds.
+#
 # Portable: POSIX bash, no GNU-only flags, macOS and Linux.
 
 set -u
@@ -34,10 +51,11 @@ MANIFEST="$REPO/manifest.txt"
 
 TIER=1
 DRY=0
+WINDOWS=auto
 CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
 usage() {
-  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -47,6 +65,8 @@ while [ $# -gt 0 ]; do
             TIER="$2"; shift 2 ;;
     --tier=*) TIER="${1#*=}"; shift ;;
     --dry-run) DRY=1; shift ;;
+    --windows) WINDOWS=1; shift ;;
+    --no-windows) WINDOWS=0; shift ;;
     --config-dir) [ $# -ge 2 ] || { echo "install: --config-dir needs a value" >&2; exit 2; }
                   CONFIG_DIR="$2"; shift 2 ;;
     --config-dir=*) CONFIG_DIR="${1#*=}"; shift ;;
@@ -61,6 +81,39 @@ case "$TIER" in
 esac
 [ -f "$MANIFEST" ] || { echo "install: manifest not found at $MANIFEST" >&2; exit 2; }
 
+# --- Windows mode -----------------------------------------------------------
+# Explicit flags win. Otherwise sniff, and always say which signal decided it:
+# a silent auto-detect that guesses wrong is exactly how a guard ends up wired
+# to a script nothing on the machine will run.
+WIN_WHY=""
+case "$WINDOWS" in
+  1) WIN_WHY="--windows was passed" ;;
+  0) WIN_WHY="--no-windows was passed" ;;
+  *)
+    UNAME_S=$(uname -s 2>/dev/null || echo unknown)
+    if [ "${OS:-}" = "Windows_NT" ]; then
+      WINDOWS=1; WIN_WHY="\$OS is Windows_NT"
+    else
+      case "$UNAME_S" in
+        MINGW*|MSYS*|CYGWIN*)
+          WINDOWS=1
+          if [ -n "${USERPROFILE:-}" ]; then
+            WIN_WHY="uname -s is $UNAME_S and \$USERPROFILE is set"
+          else
+            WIN_WHY="uname -s is $UNAME_S"
+          fi ;;
+        *) WINDOWS=0; WIN_WHY="uname -s is $UNAME_S, no Windows signal" ;;
+      esac
+    fi ;;
+esac
+
+# The settings template is per-platform; everything else is shared.
+if [ "$WINDOWS" -eq 1 ]; then
+  SETTINGS_SRC="claude/settings.work.windows.template.json"
+else
+  SETTINGS_SRC="claude/settings.work.template.json"
+fi
+
 STAMP="$(date '+%Y%m%dT%H%M%S')"
 BACKUP="$CONFIG_DIR/harness-backup-$STAMP"
 backup_made=0
@@ -71,6 +124,12 @@ act()  { if [ "$DRY" -eq 1 ]; then printf '  would %s\n' "$*"; else printf '  %s
 say "install: repo       $REPO"
 say "install: config dir $CONFIG_DIR"
 say "install: tier       $TIER$( [ "$DRY" -eq 1 ] && printf ' (dry run)' )"
+if [ "$WINDOWS" -eq 1 ]; then
+  say "install: windows    ON  ($WIN_WHY)"
+  say "install: template   $SETTINGS_SRC"
+else
+  say "install: windows    off ($WIN_WHY)"
+fi
 say ""
 
 # Back up one destination file, preserving its path under the backup dir.
@@ -125,6 +184,7 @@ install_one() { # $1 = repo-relative source, $2 = config-dir-relative dest
 
 installed=0
 skipped_settings=0
+skipped_win=0
 
 while IFS='|' read -r kind tier repo_path live_path; do
   case "$kind" in ''|'#'*) continue ;; esac
@@ -132,9 +192,20 @@ while IFS='|' read -r kind tier repo_path live_path; do
   [ "$tier" -le "$TIER" ] || continue
   [ "$live_path" != "-" ] || continue
 
-  # settings.json needs the never-clobber rule, so it is handled below.
+  # authored-win rows are the Windows-only PowerShell twins. See the kind
+  # documentation at the top of manifest.txt.
+  case "$kind" in
+    authored-win)
+      if [ "$WINDOWS" -ne 1 ]; then
+        skipped_win=$((skipped_win + 1))
+        continue
+      fi ;;
+  esac
+
+  # settings.json needs the never-clobber rule, so both templates are handled
+  # below rather than as plain rows.
   case "$repo_path" in
-    claude/settings.work.template.json) continue ;;
+    claude/settings.work.template.json|claude/settings.work.windows.template.json) continue ;;
   esac
 
   install_one "$repo_path" "$live_path" && installed=$((installed + 1))
@@ -147,7 +218,7 @@ if [ "$TIER" -ge 2 ]; then
   dst="$CONFIG_DIR/settings.json"
   if [ -e "$dst" ]; then
     skipped_settings=1
-    install_one "claude/settings.work.template.json" "settings.work.template.json" >/dev/null
+    install_one "$SETTINGS_SRC" "settings.work.template.json" >/dev/null
     act "wrote settings.work.template.json next to your existing settings.json"
     say ""
     say "  A settings.json already exists here, so it was NOT touched. Merge by hand:"
@@ -168,9 +239,43 @@ if [ "$TIER" -ge 2 ]; then
     say "    6. Validate before you rely on it:"
     say "         jq empty $CONFIG_DIR/settings.json"
   else
-    install_one "claude/settings.work.template.json" "settings.json" && installed=$((installed + 1))
+    install_one "$SETTINGS_SRC" "settings.json" && installed=$((installed + 1))
     say "  No settings.json existed, so the template was installed as one."
     say "  Hook paths were rewritten to $CONFIG_DIR."
+  fi
+
+  # --- Windows: the guards only fire if PowerShell 7 is actually there -------
+  if [ "$WINDOWS" -eq 1 ]; then
+    say ""
+    say "install: windows tier 2"
+    say "  The four guards are wired as:"
+    say "      pwsh -NoProfile -File \"$CONFIG_DIR/hooks/<name>.ps1\""
+    say "  The quotes are deliberate: a profile directory with a space in it"
+    say "  would otherwise split the argument and the guard would never fire."
+    say "  Forward slashes are deliberate too. Under Git Bash __CLAUDE_HOME__ is"
+    say "  substituted with a path like C:/Users/<you>/.claude, which pwsh"
+    say "  accepts and which needs no JSON backslash escaping."
+    say "  The .sh guards are installed alongside the twins and are harmless."
+    say "  There is no PowerShell twin of log-skill-fire, so the Windows"
+    say "  template carries no PostToolUse block. That hook only writes a log."
+    if command -v pwsh >/dev/null 2>&1; then
+      psver=$(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>/dev/null)
+      if [ -n "$psver" ]; then
+        say "  pwsh found on PATH, version $psver"
+        case "$psver" in
+          7.*|8.*|9.*|1[0-9].*) ;;
+          *) say "  WARNING: that is not PowerShell 7 or newer. The twins need 7+." ;;
+        esac
+      else
+        say "  WARNING: pwsh is on PATH but did not report a version."
+      fi
+    else
+      say ""
+      say "  WARNING: no pwsh on PATH. The guards are wired but WILL NOT FIRE."
+      say "  Windows PowerShell 5.1 (powershell.exe) is a different product and"
+      say "  is not enough. Install PowerShell 7 or newer, then check:"
+      say "      pwsh -NoProfile -Command '\$PSVersionTable.PSVersion.ToString()'"
+    fi
   fi
 fi
 
@@ -188,6 +293,9 @@ fi
 say ""
 if [ "$DRY" -eq 1 ]; then
   say "install: dry run complete, nothing written."
+  if [ "$skipped_win" -gt 0 ]; then
+    say "install: $skipped_win Windows-only file(s) skipped (not a Windows install)."
+  fi
 else
   say "install: $installed file(s) installed."
   if [ "$backup_made" -eq 1 ]; then
@@ -195,6 +303,9 @@ else
   fi
   if [ "$skipped_settings" -eq 1 ]; then
     say "install: settings.json left alone, see the merge steps above."
+  fi
+  if [ "$skipped_win" -gt 0 ]; then
+    say "install: $skipped_win Windows-only file(s) skipped (not a Windows install)."
   fi
   if [ "$TIER" -ge 1 ]; then
     say ""

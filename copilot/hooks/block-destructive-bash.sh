@@ -67,7 +67,21 @@
 
 # GUARD_LOG is env-overridable so the test suite can point fires at a temp log
 # instead of polluting the production audit log.
-LOG="${GUARD_LOG:-${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log}"
+# Log path, resolved in order: the GUARD_LOG override (the test suite points it
+# at a temp file), the directory this script is INSTALLED IN, then the Copilot
+# config dir. The script-dir step is what lets one twin serve both targets:
+# under <copilot>/hooks it resolves to exactly the same guard.log as before,
+# and under <claude>/hooks (the Windows install of the Claude target, see
+# bin/install.sh --windows) it logs beside the Claude guards instead of into a
+# .copilot tree that may not exist on that machine at all.
+HOOK_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd -P) || HOOK_DIR=""
+if [ -n "${GUARD_LOG:-}" ]; then
+  LOG="$GUARD_LOG"
+elif [ -n "$HOOK_DIR" ]; then
+  LOG="$HOOK_DIR/guard.log"
+else
+  LOG="${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log"
+fi
 
 INPUT=$(cat)
 

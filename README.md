@@ -54,6 +54,16 @@ wiring, and the settings shape.
 Both targets can be installed on the same machine. They share no state: separate
 config directories, separate guard logs, separate boundary state.
 
+**A Copilot-only machine still wants the Claude target first.** GitHub's
+Copilot-hosted Claude coding agent (built on the Claude Agent SDK, billed to
+Copilot, driven from VS Code) loads the whole `~/.claude` tree: the `CLAUDE.md`
+rules, `~/.claude/skills`, the `settings.json` hooks, and the `agents/*.md`
+subagents. That is confirmed from daily use, and it is undocumented by either
+vendor, so treat it as observed behavior that could change. The practical
+consequence: on a box with a Copilot license and no Claude Code license,
+`bin/install.sh` is the primary install and the Copilot port is the fallback
+that covers Copilot CLI and the non-Claude models.
+
 Design detail, gotchas, and the full three-way mapping table:
 `docs/copilot-port_design_2026-08-24.md`.
 
@@ -67,7 +77,7 @@ and still have something useful. The ladder is the same for both targets.
 |---|---|---|---|
 | 0 | `CLAUDE.core.md`, `DISPATCH.core.md`, the work `CLAUDE.md` template | the same two documents as `harness-core.instructions.md` and `dispatch.instructions.md` | Nothing. Plain markdown, nothing executes. |
 | 1 | 7 skills, 1 subagent | the same 7 skills, the same subagent as `web-verifier.agent.md` | Markdown only, nothing executes. Two caveats: the `autonomous` skill installs its guidance here but its automation only at tier 2, so at tier 1 it walks you through the work by hand; and `graphify` expects a third-party CLI installed from PyPI, a software-approval item on a managed machine. |
-| 2 | 5 guard hooks, settings wiring, the `autonomous` skill's executable helpers | 4 guard hooks, `hooks/harness-hooks.json` wiring, the settings template, the same helpers | Permission for the agent to run local shell scripts. The guards fire on every tool call; the helper scripts run only when you invoke the `autonomous` skill. Needs `jq`; `perl` for the em-dash transform. |
+| 2 | 5 guard hooks, settings wiring, the `autonomous` skill's executable helpers. On Windows, `--windows` wires 4 PowerShell 7 twins instead of the `.sh` guards; `log-skill-fire` has no twin | 4 guard hooks, `hooks/harness-hooks.json` wiring, the settings template, the same helpers | Permission for the agent to run local shell scripts. The guards fire on every tool call; the helper scripts run only when you invoke the `autonomous` skill. Needs `jq`; `perl` for the em-dash transform. On Windows the twins need PowerShell 7+ (`pwsh`) and need neither `jq` nor `perl`. |
 | 3 | MCP and plugin manifests | the same, plus two MCP example files and the VS Code settings snippet | Network access and a policy decision per server. Installs nothing by itself. |
 
 Tier 1 is the default because it is the best capability-per-risk trade: it is
@@ -132,6 +142,72 @@ than `~/.copilot`. The installer substitutes `__COPILOT_HOME__` and
 `__CLAUDE_HOME__` in every installed file with the real directory.
 
 ## Windows install
+
+Two installers, same rules. Do the Claude target first: it is what the
+Copilot-hosted Claude agent reads. Add the Copilot target after it if you also
+use Copilot CLI or a non-Claude model.
+
+### Claude target
+
+```bash
+CLAUDE_CONFIG_DIR="$USERPROFILE/.claude" ./bin/install.sh --tier 2 --windows --dry-run
+CLAUDE_CONFIG_DIR="$USERPROFILE/.claude" ./bin/install.sh --tier 2 --windows
+```
+
+Tiers 0, 1 and 3 are markdown and already worked here; drop `--tier 2` to `1`
+if the answers from IT stop you short of executable hooks. `--windows` changes
+tier 2 and nothing else:
+
+- It installs the four PowerShell 7 twins into `<config>/hooks/` plus
+  `hooks/lib/recycle.ps1`, alongside the `.sh` guards, which are left in place
+  because they are harmless and Git Bash may well run them.
+- It uses `claude/settings.work.windows.template.json`, which wires each guard
+  as `pwsh -NoProfile -File "__CLAUDE_HOME__/hooks/<name>.ps1"`. The installer
+  substitutes `__CLAUDE_HOME__` with the real config dir, which under Git Bash
+  is the forward-slash form (`C:/Users/<you>/.claude`). pwsh accepts that
+  happily and it needs no JSON backslash escaping. The script path is quoted
+  because a profile directory with a space in it would otherwise split the
+  argument, and a guard wired to a split path never fires.
+- The never-clobber rule is unchanged: an existing `settings.json` is never
+  touched, and the substituted template lands beside it for a hand merge.
+- The flag auto-enables under Git Bash and under `$OS=Windows_NT`, and the
+  banner names the signal that decided it. Pass `--no-windows` to force the
+  POSIX wiring.
+- **Under WSL it does NOT auto-enable**, because `uname -s` there is `Linux`
+  and `$USERPROFILE` is unset. Pass `--windows` explicitly and point the config
+  dir at the Windows home, `CLAUDE_CONFIG_DIR=/mnt/c/Users/<you>/.claude`: the
+  files are read by a Windows process, so they need the PowerShell wiring even
+  though the installer ran on Linux.
+
+Why the twins at all: the POSIX template wires each guard as a bare `.sh` path,
+and which shell the agent spawns a hook command through on Windows is
+undocumented. If it is not Git Bash, those guards silently never fire, which is
+the worst failure mode a guard has.
+
+Read this before relying on it:
+
+- **PowerShell 7+ must be on PATH.** The installer runs
+  `pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'` and prints
+  what it finds, and warns loudly when there is nothing to find. Windows
+  PowerShell 5.1 is a different product and will not run these guards.
+- **There is no PowerShell twin of `log-skill-fire`,** so the Windows template
+  carries no `PostToolUse` block at all. That hook only appends a line to a log,
+  so nothing protective is lost. If you want it, run tier 2 from Git Bash and
+  add the `.sh` entry back by hand.
+- **The Recycle Bin rewrite is still unverified on real Windows.** See the
+  known-gaps note below: the same caveat applies to this target, because it is
+  the same helper script.
+- **The guard log and the edit-boundary state file follow the install.** Both
+  resolve next to the script that is running, so a Claude-target install logs to
+  `<config>/hooks/guard.log` and reads `<config>/hooks/state/edit-boundary`,
+  which is exactly the file the `edit-freeze` skill arms.
+- Verify with the Windows test, which runs from Git Bash or WSL:
+  ```bash
+  bash claude/hooks/tests/test-claude-windows.sh
+  ```
+  Its PowerShell half skips when no `pwsh` is found, and says so.
+
+### Copilot target
 
 The installer is a bash script, which is not a problem: it only copies files and
 substitutes a path placeholder. Two ways to run it.
@@ -355,11 +431,14 @@ claude/
   CLAUDE.core.md              portable rules (tier 0)
   DISPATCH.core.md            subagent dispatch contract (tier 0)
   settings.work.template.json hook wiring + deny list (tier 2)
+  settings.work.windows.template.json  the same, wired to the PowerShell twins
+                              (tier 2, installed by --windows only)
   mcp.manifest.md             optional MCP servers (tier 3, reading only)
   plugins.manifest.md         optional plugins (tier 3, reading only)
   skills/                     7 skills (tier 1), shared by BOTH targets
   agents/                     1 subagent (tier 1)
   hooks/                      5 guards + smoke test (tier 2)
+  hooks/tests/test-claude-windows.sh  the Windows tier-2 test (repo only)
 copilot/
   instructions/               the two core documents as *.instructions.md (tier 0)
   agents/web-verifier.agent.md  the same subagent, Copilot format (tier 1)
