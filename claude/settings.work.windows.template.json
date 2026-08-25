@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES": "3"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(sudo *)",
+      "Bash(mkfs *)",
+      "Bash(dd *)",
+      "Bash(wget *|bash*)",
+      "Bash(wget *| bash*)",
+      "Bash(git push --force*)",
+      "Bash(git push *--force*)",
+      "Bash(git reset --hard*)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.zshrc)",
+      "Edit(~/.ssh/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.git-credentials)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.kube/**)",
+      "Read(~/.npmrc)",
+      "Read(~/.npm/**)",
+      "Read(~/.pypirc)",
+      "Read(~/.gem/credentials)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/.claude.json)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.config/**/*.env)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/block-destructive-bash.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/block-em-dash.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/guard-edit-boundary.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/guard-reread.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

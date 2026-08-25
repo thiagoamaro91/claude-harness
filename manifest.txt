@@ -6,6 +6,16 @@
 #             authored  written for this repo; no live counterpart, so the
 #                       sync scripts skip it. install.sh still installs the
 #                       ones whose live-path is not "-".
+#             authored-win  authored, and WINDOWS ONLY. This is the platform
+#                       convention: rows have no platform column, so the kind
+#                       carries it. bin/install.sh installs an authored-win row
+#                       only when it runs with --windows (passed, or detected
+#                       from a Windows shell); on macOS and Linux it skips them
+#                       and reports how many. Every other reader is unaffected:
+#                       export.sh and import.sh walk "sync" rows only, and
+#                       guard/scan.sh does not read this manifest at all.
+#                       Adding a platform is therefore one new kind here and
+#                       one case in install.sh, nothing else.
 #   tier      lowest install tier that includes the file (install.sh --tier N
 #             installs every row with tier <= N). Tier 3 rows are printed,
 #             not copied.
@@ -78,18 +88,43 @@ sync|2|claude/hooks/log-skill-fire.sh|hooks/log-skill-fire.sh
 authored|2|claude/hooks/tests/test-guards-smoke.sh|hooks/tests/test-guards-smoke.sh
 authored|2|claude/settings.work.template.json|-
 
+# --- tier 2, Windows only: the PowerShell 7 guard twins ---------------------
+# Same guards, same policy, written in PowerShell because which shell the agent
+# spawns a hook command through on Windows is undocumented, and a bare .sh path
+# that no shell runs is a guard that silently never fires. There is exactly one
+# copy of each twin and it lives under copilot/, where it was first written;
+# bin/install-copilot.sh reaches the same files through manifest.copilot.txt.
+# The .sh guards are installed alongside them on Windows too: they are harmless,
+# and Git Bash may well run them.
+#
+# The Windows settings template wires the four guards as
+# "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/<name>.ps1". It carries no
+# PostToolUse block: log-skill-fire has no PowerShell twin and is logging only.
+# Like the POSIX template its live-path is "-", because install.sh handles
+# settings.json under the never-clobber rule rather than as a plain row.
+authored-win|2|copilot/hooks/block-destructive-bash.ps1|hooks/block-destructive-bash.ps1
+authored-win|2|copilot/hooks/block-em-dash.ps1|hooks/block-em-dash.ps1
+authored-win|2|copilot/hooks/guard-edit-boundary.ps1|hooks/guard-edit-boundary.ps1
+authored-win|2|copilot/hooks/guard-reread.ps1|hooks/guard-reread.ps1
+authored-win|2|copilot/hooks/lib/recycle.ps1|hooks/lib/recycle.ps1
+authored-win|2|claude/settings.work.windows.template.json|-
+
 # --- tier 3: optional MCP and plugin layers, print only ---
 authored|3|claude/mcp.manifest.md|-
 authored|3|claude/plugins.manifest.md|-
 
 # --- the GitHub Copilot target ---
 # These rows exist so this manifest stays the repo-wide allowlist: every
-# tracked file has a row. They are all tier 9 with live-path "-", so
+# tracked file has a row. They are tier 9 with live-path "-", so
 # bin/install.sh never copies them into the Claude config dir and the sync
 # scripts skip them (those walk "sync" rows only). What installs them is
 # bin/install-copilot.sh, driven by manifest.copilot.txt, into the Copilot
 # config dir instead. Skills are NOT duplicated for that target: the Copilot
 # manifest points straight at the claude/skills rows above.
+#
+# The five .ps1 twins are the exception and are NOT listed here: they carry
+# authored-win rows in the tier-2 block above, because on Windows the Claude
+# target installs them too.
 authored|9|manifest.copilot.txt|-
 authored|9|bin/install-copilot.sh|-
 authored|9|copilot/instructions/harness-core.instructions.md|-
@@ -99,11 +134,6 @@ authored|9|copilot/hooks/block-destructive-bash.sh|-
 authored|9|copilot/hooks/block-em-dash.sh|-
 authored|9|copilot/hooks/guard-edit-boundary.sh|-
 authored|9|copilot/hooks/guard-reread.sh|-
-authored|9|copilot/hooks/block-destructive-bash.ps1|-
-authored|9|copilot/hooks/block-em-dash.ps1|-
-authored|9|copilot/hooks/guard-edit-boundary.ps1|-
-authored|9|copilot/hooks/guard-reread.ps1|-
-authored|9|copilot/hooks/lib/recycle.ps1|-
 authored|9|copilot/hooks/harness-hooks.template.json|-
 authored|9|copilot/hooks/tests/test-copilot-guards-smoke.sh|-
 authored|9|copilot/settings.work.template.json|-
