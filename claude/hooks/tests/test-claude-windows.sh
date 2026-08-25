@@ -72,11 +72,16 @@ eq w6-four-guards 4 "$(jq '[.hooks.PreToolUse[].hooks[]]|length' "$WIN_TPL")"
 # at nothing is worse than no guard: it looks configured and never fires.
 jq -r '.hooks.PreToolUse[].hooks[].command' "$WIN_TPL" > "$TMPD/cmds"
 while IFS= read -r cmd; do
+  # The script path MUST be quoted inside the command string: a corporate
+  # profile directory with a space in it would otherwise split the argument and
+  # the guard would silently never fire, which is the exact failure this whole
+  # mode exists to prevent.
   case "$cmd" in
-    "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/"*.ps1) ;;
-    *) bad w7-command-form "not the pwsh form: $cmd"; continue ;;
+    'pwsh -NoProfile -File "__CLAUDE_HOME__/hooks/'*'.ps1"') ;;
+    *) bad w7-command-form "not the quoted pwsh form: $cmd"; continue ;;
   esac
   live="hooks/${cmd##*/hooks/}"
+  live="${live%\"}"
   repo_path=$(awk -F'|' -v l="$live" '$1=="authored-win" && $4==l {print $3}' "$MANIFEST")
   if [ -z "$repo_path" ]; then
     bad w7-manifest-row "no authored-win row installs $live"
@@ -110,6 +115,18 @@ case "$posout" in
   *"settings.work.windows.template.json"*) bad w12-posix-template-used "the posix dry run named the windows template" ;;
   *) ok w12-posix-template-used ;;
 esac
+
+# A real install into a directory with a space in its name: the substituted
+# command must still name a file that exists. This is the failure the quoting
+# above defends against, checked end to end rather than by inspection.
+spacedir="$TMPD/with space/.claude"
+"$REPO/bin/install.sh" --tier 2 --windows --config-dir "$spacedir" >/dev/null 2>&1
+if jq empty "$spacedir/settings.json" 2>/dev/null; then ok w13-space-valid-json; else bad w13-space-valid-json "settings.json is not valid JSON"; fi
+jq -r '.hooks.PreToolUse[].hooks[].command' "$spacedir/settings.json" 2>/dev/null > "$TMPD/spacecmds"
+while IFS= read -r cmd; do
+  f="${cmd#*-File \"}"; f="${f%\"}"
+  [ -f "$f" ] && ok "w13-space-target-exists ${f##*/}" || bad w13-space-target-exists "wired at [$f], which is not a file"
+done < "$TMPD/spacecmds"
 
 # -------------------------------------------------------------- payload half
 HOOKS="$REPO/copilot/hooks"

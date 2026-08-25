@@ -13,3 +13,12 @@ __pycache__/
 *.swp
 *~
 harness-backup-*/
+
+# Guard runtime artifacts. Each guard resolves its log and its edit-boundary
+# state next to the script that is running, so invoking one straight out of the
+# repo tree (a manual probe, a test run with GUARD_LOG unset) drops these here.
+# They hold absolute paths, which is exactly what guard/scan.sh hunts, and the
+# scanner only sees TRACKED files, so an untracked one would ride along on the
+# first `git add -A`.
+guard.log
+**/hooks/state/

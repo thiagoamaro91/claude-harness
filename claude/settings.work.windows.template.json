@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/block-destructive-bash.ps1"
+            "command": "pwsh -NoProfile -File \"__CLAUDE_HOME__/hooks/block-destructive-bash.ps1\""
           }
         ]
       },
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/block-em-dash.ps1"
+            "command": "pwsh -NoProfile -File \"__CLAUDE_HOME__/hooks/block-em-dash.ps1\""
           }
         ]
       },
@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/guard-edit-boundary.ps1"
+            "command": "pwsh -NoProfile -File \"__CLAUDE_HOME__/hooks/guard-edit-boundary.ps1\""
           }
         ]
       },
@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/guard-reread.ps1"
+            "command": "pwsh -NoProfile -File \"__CLAUDE_HOME__/hooks/guard-reread.ps1\""
           }
         ]
       }

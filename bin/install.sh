@@ -28,7 +28,8 @@
 # wired that way may silently never fire. With --windows, tier 2 additionally
 # installs the PowerShell 7 twins (the manifest's authored-win rows) and uses
 # claude/settings.work.windows.template.json, which invokes each guard as
-# "pwsh -NoProfile -File <config-dir>/hooks/<name>.ps1". The .sh guards are
+# pwsh -NoProfile -File "<config-dir>/hooks/<name>.ps1", script path quoted so
+# a profile directory with a space in it cannot split it. The .sh guards are
 # installed too: they are harmless, and Git Bash may well run them.
 #
 # --windows is auto-detected from $OS=Windows_NT or from a MINGW/MSYS/CYGWIN
@@ -247,8 +248,11 @@ if [ "$TIER" -ge 2 ]; then
   if [ "$WINDOWS" -eq 1 ]; then
     say ""
     say "install: windows tier 2"
-    say "  The four guards are wired as: pwsh -NoProfile -File $CONFIG_DIR/hooks/<name>.ps1"
-    say "  Forward slashes are deliberate. Under Git Bash __CLAUDE_HOME__ is"
+    say "  The four guards are wired as:"
+    say "      pwsh -NoProfile -File \"$CONFIG_DIR/hooks/<name>.ps1\""
+    say "  The quotes are deliberate: a profile directory with a space in it"
+    say "  would otherwise split the argument and the guard would never fire."
+    say "  Forward slashes are deliberate too. Under Git Bash __CLAUDE_HOME__ is"
     say "  substituted with a path like C:/Users/<you>/.claude, which pwsh"
     say "  accepts and which needs no JSON backslash escaping."
     say "  The .sh guards are installed alongside the twins and are harmless."

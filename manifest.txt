@@ -98,7 +98,8 @@ authored|2|claude/settings.work.template.json|-
 # and Git Bash may well run them.
 #
 # The Windows settings template wires the four guards as
-# "pwsh -NoProfile -File __CLAUDE_HOME__/hooks/<name>.ps1". It carries no
+# pwsh -NoProfile -File "__CLAUDE_HOME__/hooks/<name>.ps1", script path quoted
+# so a profile directory with a space in it cannot split it. It carries no
 # PostToolUse block: log-skill-fire has no PowerShell twin and is logging only.
 # Like the POSIX template its live-path is "-", because install.sh handles
 # settings.json under the never-clobber rule rather than as a plain row.

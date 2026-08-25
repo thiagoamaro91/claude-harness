@@ -162,15 +162,22 @@ tier 2 and nothing else:
   `hooks/lib/recycle.ps1`, alongside the `.sh` guards, which are left in place
   because they are harmless and Git Bash may well run them.
 - It uses `claude/settings.work.windows.template.json`, which wires each guard
-  as `pwsh -NoProfile -File __CLAUDE_HOME__/hooks/<name>.ps1`. The installer
+  as `pwsh -NoProfile -File "__CLAUDE_HOME__/hooks/<name>.ps1"`. The installer
   substitutes `__CLAUDE_HOME__` with the real config dir, which under Git Bash
   is the forward-slash form (`C:/Users/<you>/.claude`). pwsh accepts that
-  happily and it needs no JSON backslash escaping.
+  happily and it needs no JSON backslash escaping. The script path is quoted
+  because a profile directory with a space in it would otherwise split the
+  argument, and a guard wired to a split path never fires.
 - The never-clobber rule is unchanged: an existing `settings.json` is never
   touched, and the substituted template lands beside it for a hand merge.
 - The flag auto-enables under Git Bash and under `$OS=Windows_NT`, and the
   banner names the signal that decided it. Pass `--no-windows` to force the
   POSIX wiring.
+- **Under WSL it does NOT auto-enable**, because `uname -s` there is `Linux`
+  and `$USERPROFILE` is unset. Pass `--windows` explicitly and point the config
+  dir at the Windows home, `CLAUDE_CONFIG_DIR=/mnt/c/Users/<you>/.claude`: the
+  files are read by a Windows process, so they need the PowerShell wiring even
+  though the installer ran on Linux.
 
 Why the twins at all: the POSIX template wires each guard as a bare `.sh` path,
 and which shell the agent spawns a hook command through on Windows is

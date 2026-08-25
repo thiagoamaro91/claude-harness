@@ -427,7 +427,9 @@ path, and which shell the agent spawns a hook command through on Windows is
 undocumented. If it is not Git Bash, those guards silently never fire.
 
 `claude/settings.work.windows.template.json` wires the same four guards as
-`pwsh -NoProfile -File __CLAUDE_HOME__/hooks/<name>.ps1`, using the very same
+`pwsh -NoProfile -File "__CLAUDE_HOME__/hooks/<name>.ps1"` (script path quoted:
+a profile directory with a space in it would split an unquoted one, and a guard
+wired to a split path never fires), using the very same
 PowerShell twins this document specified for the Copilot target. They were
 written to be reusable that way: they self-filter on both tool-name families,
 read both inner-key casings, and dual-emit the Claude contract alongside the
