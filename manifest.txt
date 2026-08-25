@@ -108,6 +108,12 @@ authored-win|2|copilot/hooks/guard-edit-boundary.ps1|hooks/guard-edit-boundary.p
 authored-win|2|copilot/hooks/guard-reread.ps1|hooks/guard-reread.ps1
 authored-win|2|copilot/hooks/lib/recycle.ps1|hooks/lib/recycle.ps1
 authored-win|2|claude/settings.work.windows.template.json|-
+# The Windows test is repo-side: it reads this manifest, runs bin/install.sh
+# --dry-run in both directions, and drives the twins out of the repo tree, so
+# there is nothing useful about a copy inside a config dir. live-path "-", and
+# it is NOT an authored-win row: it must run on macOS and Linux too, where its
+# PowerShell half skips and its POSIX half still checks every expectation.
+authored|9|claude/hooks/tests/test-claude-windows.sh|-
 
 # --- tier 3: optional MCP and plugin layers, print only ---
 authored|3|claude/mcp.manifest.md|-
