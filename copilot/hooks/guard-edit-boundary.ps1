@@ -38,11 +38,22 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Log path, resolved in order: the GUARD_LOG override (the test suite points it
+# at a temp file), the directory this script is INSTALLED IN, then the Copilot
+# config dir. The script-dir step is what lets one twin serve both targets:
+# under <copilot>/hooks it resolves to exactly the same guard.log as before,
+# and under <claude>/hooks (the Windows install of the Claude target, see
+# bin/install.sh --windows) it logs beside the Claude guards instead of into a
+# .copilot tree that may not exist on that machine at all.
 $LOG = $env:GUARD_LOG
 if (-not $LOG) {
-    $cop = $env:COPILOT_HOME
-    if (-not $cop) { $cop = Join-Path $HOME '.copilot' }
-    $LOG = Join-Path (Join-Path $cop 'hooks') 'guard.log'
+    if ($PSScriptRoot) {
+        $LOG = Join-Path $PSScriptRoot 'guard.log'
+    } else {
+        $cop = $env:COPILOT_HOME
+        if (-not $cop) { $cop = Join-Path $HOME '.copilot' }
+        $LOG = Join-Path (Join-Path $cop 'hooks') 'guard.log'
+    }
 }
 
 function Write-GuardLog([string]$line) {
@@ -62,7 +73,10 @@ function Get-Prop($obj, [string]$name) {
     return $null
 }
 
-# State-file resolution, in order: explicit override, Copilot path, Claude path.
+# State-file resolution, in order: explicit override, a state/ directory beside
+# this script (whichever config dir it was installed into), Copilot path, Claude
+# path. The script-dir step keeps one twin correct under both ~/.copilot/hooks
+# and ~/.claude/hooks with no environment variable set.
 #
 # The Claude fallback is what makes the feature work at all. The edit-freeze
 # skill is SHARED verbatim between the two targets and its arm/disarm commands
@@ -74,12 +88,15 @@ $STATE = $env:EDIT_BOUNDARY_FILE
 if (-not $STATE) {
     $cop = $env:COPILOT_HOME
     if (-not $cop) { $cop = Join-Path $HOME '.copilot' }
-    $STATE = Join-Path $cop 'hooks/state/edit-boundary'
+    $copState = Join-Path $cop 'hooks/state/edit-boundary'
+    $cl = $env:CLAUDE_CONFIG_DIR
+    if (-not $cl) { $cl = Join-Path $HOME '.claude' }
+    $claudeState = Join-Path $cl 'hooks/state/edit-boundary'
+    if ($PSScriptRoot) { $STATE = Join-Path $PSScriptRoot 'state/edit-boundary' }
+    else { $STATE = $copState }
     if (-not (Test-Path -LiteralPath $STATE)) {
-        $cl = $env:CLAUDE_CONFIG_DIR
-        if (-not $cl) { $cl = Join-Path $HOME '.claude' }
-        $claudeState = Join-Path $cl 'hooks/state/edit-boundary'
-        if (Test-Path -LiteralPath $claudeState) { $STATE = $claudeState }
+        if (Test-Path -LiteralPath $copState) { $STATE = $copState }
+        elseif (Test-Path -LiteralPath $claudeState) { $STATE = $claudeState }
     }
 }
 

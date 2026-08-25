@@ -44,11 +44,22 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Log path, resolved in order: the GUARD_LOG override (the test suite points it
+# at a temp file), the directory this script is INSTALLED IN, then the Copilot
+# config dir. The script-dir step is what lets one twin serve both targets:
+# under <copilot>/hooks it resolves to exactly the same guard.log as before,
+# and under <claude>/hooks (the Windows install of the Claude target, see
+# bin/install.sh --windows) it logs beside the Claude guards instead of into a
+# .copilot tree that may not exist on that machine at all.
 $LOG = $env:GUARD_LOG
 if (-not $LOG) {
-    $cop = $env:COPILOT_HOME
-    if (-not $cop) { $cop = Join-Path $HOME '.copilot' }
-    $LOG = Join-Path (Join-Path $cop 'hooks') 'guard.log'
+    if ($PSScriptRoot) {
+        $LOG = Join-Path $PSScriptRoot 'guard.log'
+    } else {
+        $cop = $env:COPILOT_HOME
+        if (-not $cop) { $cop = Join-Path $HOME '.copilot' }
+        $LOG = Join-Path (Join-Path $cop 'hooks') 'guard.log'
+    }
 }
 
 function Write-GuardLog([string]$line) {

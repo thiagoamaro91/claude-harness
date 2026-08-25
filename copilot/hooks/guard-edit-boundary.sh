@@ -44,10 +44,26 @@
 # Copilot docs name the write tools but publish neither their argument schema
 # nor a casing guarantee.
 
-LOG="${GUARD_LOG:-${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log}"
+# Log path, resolved in order: the GUARD_LOG override (the test suite points it
+# at a temp file), the directory this script is INSTALLED IN, then the Copilot
+# config dir. The script-dir step is what lets one twin serve both targets:
+# under <copilot>/hooks it resolves to exactly the same guard.log as before,
+# and under <claude>/hooks (the Windows install of the Claude target, see
+# bin/install.sh --windows) it logs beside the Claude guards instead of into a
+# .copilot tree that may not exist on that machine at all.
+HOOK_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd -P) || HOOK_DIR=""
+if [ -n "${GUARD_LOG:-}" ]; then
+  LOG="$GUARD_LOG"
+elif [ -n "$HOOK_DIR" ]; then
+  LOG="$HOOK_DIR/guard.log"
+else
+  LOG="${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log"
+fi
 
-# State-file resolution, in order: an explicit override, the Copilot path, then
-# the Claude path.
+# State-file resolution, in order: an explicit override, a state/ directory
+# beside this script (whichever config dir it was installed into), the Copilot
+# path, then the Claude path. The script-dir step keeps one twin correct under
+# both ~/.copilot/hooks and ~/.claude/hooks with no environment variable set.
 #
 # The Claude fallback is not tidiness, it is what makes the feature work at all.
 # The edit-freeze skill is SHARED verbatim between the two targets (the
@@ -63,10 +79,19 @@ LOG="${GUARD_LOG:-${COPILOT_HOME:-$HOME/.copilot}/hooks/guard.log}"
 # freeze actually wants.
 STATE="${EDIT_BOUNDARY_FILE:-}"
 if [ -z "$STATE" ]; then
-  STATE="${COPILOT_HOME:-$HOME/.copilot}/hooks/state/edit-boundary"
+  if [ -n "$HOOK_DIR" ]; then
+    STATE="$HOOK_DIR/state/edit-boundary"
+  else
+    STATE="${COPILOT_HOME:-$HOME/.copilot}/hooks/state/edit-boundary"
+  fi
   if [ ! -f "$STATE" ]; then
+    copilot_state="${COPILOT_HOME:-$HOME/.copilot}/hooks/state/edit-boundary"
     claude_state="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/state/edit-boundary"
-    [ -f "$claude_state" ] && STATE="$claude_state"
+    if [ -f "$copilot_state" ]; then
+      STATE="$copilot_state"
+    elif [ -f "$claude_state" ]; then
+      STATE="$claude_state"
+    fi
   fi
 fi
 
